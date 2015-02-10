@@ -1,0 +1,234 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|AnyCPU">
+      <Configuration>Debug</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x86">
+      <Configuration>Debug</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|AnyCPU">
+      <Configuration>Release</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM">
+      <Configuration>Release</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x86">
+      <Configuration>Release</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>cbb459ba-b0f8-4249-944d-9c67c23e958e</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup Condition="'$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '12.0'">
+    <VisualStudioVersion>12.0</VisualStudioVersion>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\$(WMSJSProjectDirectory)\Microsoft.VisualStudio.$(WMSJSProject).Default.props" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\$(WMSJSProjectDirectory)\Microsoft.VisualStudio.$(WMSJSProject).props" />
+  <PropertyGroup>
+    <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <RequiredPlatformVersion>8.1</RequiredPlatformVersion>
+    <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <PackageCertificateKeyFile>SGEv4_TemporaryKey.pfx</PackageCertificateKeyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <SDKReference Include="Microsoft.WinJS.2.0, Version=1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="examples\CubeMaps\CREDITS.txt" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\README.TXT" />
+    <Content Include="examples\CubeMaps\moon\LICENSE.txt" />
+    <Content Include="examples\CubeMaps\sunny\LICENSE.txt" />
+    <Content Include="examples\displMap.html" />
+    <Content Include="examples\celShading.html" />
+    <Content Include="examples\contextLost.html" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\negx.jpg" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\negy.jpg" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\negz.jpg" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\posx.jpg" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\posy.jpg" />
+    <Content Include="examples\CubeMaps\envmap_interstellar\posz.jpg" />
+    <Content Include="examples\CubeMaps\moon\posx.png" />
+    <Content Include="examples\CubeMaps\moon\negy.png" />
+    <Content Include="examples\CubeMaps\moon\negx.png" />
+    <Content Include="examples\CubeMaps\moon\negz.png" />
+    <Content Include="examples\CubeMaps\moon\posz.png" />
+    <Content Include="examples\CubeMaps\moon\posy.png" />
+    <Content Include="examples\CubeMaps\sunny\negx.png" />
+    <Content Include="examples\CubeMaps\sunny\negy.png" />
+    <Content Include="examples\CubeMaps\sunny\negz.png" />
+    <Content Include="examples\CubeMaps\sunny\posx.png" />
+    <Content Include="examples\CubeMaps\sunny\posy.png" />
+    <Content Include="examples\CubeMaps\sunny\posz.png" />
+    <Content Include="examples\culling.html" />
+    <Content Include="examples\envMap.html" />
+    <Content Include="examples\gpuBezier.html" />
+    <Content Include="examples\fog.html" />
+    <Content Include="examples\hierarchy.html" />
+    <Content Include="examples\js\dat.gui.js" />
+    <Content Include="examples\js\DemoUtils.js" />
+    <Content Include="examples\js\Shared.js" />
+    <Content Include="examples\js\spin.js" />
+    <Content Include="examples\lod.html" />
+    <Content Include="examples\Models\CREDITS.txt" />
+    <Content Include="examples\Models\Grass_01.obj" />
+    <Content Include="examples\Models\head.OBJ" />
+    <Content Include="examples\Models\model.json" />
+    <Content Include="examples\Models\tree_oak.obj" />
+    <Content Include="examples\Models\wt_teapot.obj" />
+    <Content Include="examples\Models\zombie_idle.json" />
+    <Content Include="examples\Models\zombie_jump.json" />
+    <Content Include="examples\Models\zombie_left_strafe.json" />
+    <Content Include="examples\Models\zombie_right_strafe.json" />
+    <Content Include="examples\Models\zombie_samba.json" />
+    <Content Include="examples\Models\zombie_skinning_test.json" />
+    <Content Include="examples\Models\zombie_walking.json" />
+    <Content Include="examples\Models\zombie_walking_zombie.json" />
+    <Content Include="examples\multiViews.html" />
+    <Content Include="examples\normals.html" />
+    <Content Include="examples\bumpMap.html" />
+    <Content Include="examples\particles.html" />
+    <Content Include="examples\picking.html" />
+    <Content Include="examples\pointLights.html" />
+    <Content Include="examples\postEffect.html" />
+    <Content Include="examples\renderSorting.html" />
+    <Content Include="examples\shadows.html" />
+    <Content Include="examples\skinning.html" />
+    <Content Include="examples\spotLights.html" />
+    <Content Include="examples\start.html" />
+    <Content Include="examples\Textures\691.jpg" />
+    <Content Include="examples\Textures\bumpMap.png" />
+    <Content Include="examples\Textures\celShading.png" />
+    <Content Include="examples\Textures\contextLost.png" />
+    <Content Include="examples\Textures\crate.gif" />
+    <Content Include="examples\Textures\crate_NRM.jpg" />
+    <Content Include="examples\Textures\crate_SPEC.jpg" />
+    <Content Include="examples\Textures\CREDITS.txt" />
+    <Content Include="examples\Textures\culling.png" />
+    <Content Include="examples\Textures\displMap.png" />
+    <Content Include="examples\Textures\dlc_heller_zombie_head_colour.jpg" />
+    <Content Include="examples\Textures\dlc_heller_zombie_legs_colour.jpg" />
+    <Content Include="examples\Textures\dlc_heller_zombie_torso_colour.jpg" />
+    <Content Include="examples\Textures\DSC_3518.jpg" />
+    <Content Include="examples\Textures\DSC_3518_bump.jpg" />
+    <Content Include="examples\Textures\DSC_3518_DISP.png" />
+    <Content Include="examples\Textures\envMap.png" />
+    <Content Include="examples\Textures\Fiberglass0009_S.jpg" />
+    <Content Include="examples\Textures\flare0.png" />
+    <Content Include="examples\Textures\FloorsMarble0023_S.jpg" />
+    <Content Include="examples\Textures\FloorsMarble0023_S_NRM.jpg" />
+    <Content Include="examples\Textures\FloorsMarble0023_S_SPEC.jpg" />
+    <Content Include="examples\Textures\fog.png" />
+    <Content Include="examples\Textures\gpuBezier.png" />
+    <Content Include="examples\Textures\grass_diff.jpg" />
+    <Content Include="examples\Textures\grass_diffuse.jpg" />
+    <Content Include="examples\Textures\hierarchy.png" />
+    <Content Include="examples\Textures\Infinite-Level_02_Tangent_SmoothUV.jpg" />
+    <Content Include="examples\Textures\lambertian.jpg" />
+    <Content Include="examples\Textures\lod.png" />
+    <Content Include="examples\Textures\Map-SPEC.jpg" />
+    <Content Include="examples\Textures\mirror.jpg" />
+    <Content Include="examples\Textures\multiViews.png" />
+    <Content Include="examples\Textures\normals.png" />
+    <Content Include="examples\Textures\particles.png" />
+    <Content Include="examples\Textures\picking.png" />
+    <Content Include="examples\Textures\pointLights.png" />
+    <Content Include="examples\Textures\postEffect.png" />
+    <Content Include="examples\Textures\renderSorting.png" />
+    <Content Include="examples\Textures\RockSmoothErosion0026_1_S.jpg" />
+    <Content Include="examples\Textures\rustytiles01_diff.png" />
+    <Content Include="examples\Textures\shadows.png" />
+    <Content Include="examples\Textures\skinning.png" />
+    <Content Include="examples\Textures\spotLights.png" />
+    <Content Include="examples\Textures\tree_oak_branch_d.jpg" />
+    <Content Include="examples\Textures\tree_oak_leaf_d.png" />
+    <Content Include="examples\Textures\tree_oak_trunk_d.jpg" />
+    <Content Include="examples\Textures\william_wall_01_D.png" />
+    <Content Include="examples\Textures\william_wall_01_N.png" />
+    <Content Include="examples\Textures\william_wall_01_S.png" />
+    <Content Include="examples\Textures\WoodFine0039_1_S.jpg" />
+    <Content Include="examples\uberShaders.html" />
+    <Content Include="src\core\Rectangles.js" />
+    <Content Include="src\engine\animationSystem\AnimationClip.js" />
+    <Content Include="src\engine\animationSystem\AnimationCurve.js" />
+    <Content Include="src\engine\animationSystem\AnimatorComponent.js" />
+    <Content Include="src\engine\animationSystem\Interpolators.js" />
+    <Content Include="src\engine\renderSystem\Cameras.js" />
+    <Content Include="src\engine\renderSystem\Collisions.js" />
+    <Content Include="src\engine\renderSystem\GeometryGenerator.js" />
+    <Content Include="src\engine\renderSystem\Lights.js" />
+    <Content Include="src\engine\renderSystem\Materials.js" />
+    <Content Include="src\engine\renderSystem\Meshes.js" />
+    <Content Include="src\engine\renderSystem\Programs.js" />
+    <Content Include="src\engine\System.js" />
+    <Content Include="src\libs\jquery.js" />
+    <Content Include="src\libs\Stats.js" />
+    <Content Include="src\config.js" />
+    <Content Include="src\core\DataType.js" />
+    <Content Include="src\core\VMath.js" />
+    <Content Include="src\core\States.js" />
+    <Content Include="src\engine\animationSystem\AnimationSystem.js" />
+    <Content Include="src\engine\animationSystem\Skeleton.js" />
+    <Content Include="src\engine\behaviorSystem\BehaviorComponent.js" />
+    <Content Include="src\engine\behaviorSystem\BehaviorSystem.js" />
+    <Content Include="src\engine\Engine.js" />
+    <Content Include="src\engine\Object3D.js" />
+    <Content Include="src\engine\renderSystem\MeshRendererComponent.js" />
+    <Content Include="src\engine\renderSystem\RendererVariables.js" />
+    <Content Include="src\engine\renderSystem\RenderSystem.js" />
+    <Content Include="src\engine\renderSystem\ResourceManager.js" />
+    <Content Include="src\engine\Scene.js" />
+    <Content Include="src\engine\TransformComponent.js" />
+    <Content Include="src\engine\Application.js" />
+    <Content Include="src\loaders\ImageLoader.js" />
+    <Content Include="src\loaders\Loader.js" />
+    <Content Include="src\loaders\ResourceLoader.js" />
+    <Content Include="src\loaders\TextfileLoader.js" />
+    <Content Include="src\require.js" />
+    <Content Include="src\core\Buffers.js" />
+    <Content Include="src\core\Device.js" />
+    <Content Include="src\core\EventTarget.js" />
+    <Content Include="src\core\IDObject.js" />
+    <Content Include="src\core\Pools.js" />
+    <Content Include="src\core\PrimitiveTopology.js" />
+    <Content Include="src\core\ProgramVariables.js" />
+    <Content Include="src\core\Shaders.js" />
+    <Content Include="src\core\Textures.js" />
+    <Content Include="src\libs\gl-matrix.js" />
+    <Content Include="src\libs\webgl-debug.js" />
+    <Content Include="src\SGE.js" />
+    <Content Include="src\Utils.js" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\$(WMSJSProjectDirectory)\Microsoft.VisualStudio.$(WMSJSProject).targets" />
+  <!-- To modify your build process, add your task inside one of the targets below then uncomment
+       that target and the DisableFastUpToDateCheck PropertyGroup. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  <PropertyGroup>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+  -->
+</Project>
