@@ -1,0 +1,55 @@
+aquired from http://textures.thefree3dmodels.com/
+-691.jpg
+
+aquired from http://learningwebgl.com/blog/?p=571
+-crate.gif 
+
+created by 3dregenerator (http://tf3dm.com/user/3dregenerator)
+-dlc_heller_zombie_head_colour.jpg
+-dlc_heller_zombie_legs_colour.jpg
+-dlc_heller_zombie_torso_colour.jpg
+-grass_diff.jpg
+-tree_oak_branch_d.jpg
+-tree_oak_leaf_d.png
+-tree_oak_trunk_d.jpg
+
+aquired from http://www.textureking.com/
+-DSC_3518.jpg
+
+created with crazybump (http://www.crazybump.com/)
+-crate_SPEC.jpg
+-crate_NRM.jpg
+-DSC_3518_bump.jpg
+-DSC_3518_DISP.png
+-FloorsMarble0023_S_NRM.jpg
+-FloorsMarble0023_S_SPEC.jpg
+
+aquired from www.cgtextures.com/
+-Fiberglass0009_S.jpg
+-FloorsMarble0023_S.jpg
+-WoodFine0039_1_S.jpg
+-RockSmoothErosion0026_1_S.jpg
+
+aquired from '3D Game Programming with DirectX 11' by Frank Luna (http://www.d3dcoder.net/d3d11.htm)
+-flare0.png
+
+crated by duion (http://opengameart.org/node/23917)
+-william_wall_01_D.png
+-william_wall_01_N.png
+-william_wall_01_S.png
+
+aquired from http://pixshark.com/
+-mirror.jpg
+
+created by Spiney (http://opengameart.org/node/8127)
+-rustytiles01_diff.png
+
+created by yughues (http://opengameart.org/content/tilling-textures-pack-32)
+-grass_diffuse.jpg
+
+aquired from http://threejs.org/examples/webgl_materials_normalmap.html
+-Infinite-Level_02_Tangent_SmoothUV.jpg
+-Map-SPEC.jpg
+
+aquired from http://graphics.cs.williams.edu/data/meshes.xml
+-lambertian.jpg
