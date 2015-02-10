@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>        
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils', '../examples/js/Shared', 'libs/webgl-debug'], function (SGE, DemoUtils, Shared, WebGLDebugUtils) {
+
+            var MyApp = DemoUtils.DemoInit(Shared.CullingApp(SGE, DemoUtils));
+
+            var canvas = $('<canvas>');
+            canvas = WebGLDebugUtils.makeLostContextSimulatingCanvas(canvas.get(0));
+            canvas.setRestoreTimeout(-1);
+            var gui = new dat.GUI();
+            gui.add(canvas, 'loseContext');
+            gui.add(canvas, 'restoreContext');
+            
+            new SGE.Engine({ stats: true }).run(new MyApp(gui), { canvas: canvas });
+        });
+
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,334 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>        
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+                        
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+                var colorMap;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/crate.gif');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            colorMap = SGE.createTexture(images[0], null, null, {minification : SGE.TextureFilter.LINEAR_MIPMAP_LINEAR});
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 250.0 });
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            cameraObject.addComponent(new DemoUtils.SphereView());
+                            scene.add(cameraObject);
+
+                            var vShader =
+                                [
+                                    'attribute vec3 a_position;',
+                                    'attribute vec2 a_textCoord;',
+
+                                    'uniform vec3 u_controlPoints0[4];',
+                                    'uniform vec3 u_controlPoints1[4];',
+                                    'uniform vec3 u_controlPoints2[4];',
+                                    'uniform vec3 u_controlPoints3[4];',
+
+                                    'uniform mat4 u_projView;',
+
+                                    'varying vec2 v_textCoord;',
+
+                                    'vec4 computeBernsteinBasis(float t) {',
+                                        'float oneMinusT = 1.0 - t;',
+                                        'float squaredOneMinusT = oneMinusT * oneMinusT;',
+                                        'float squaredT = t * t;',
+                                        'return vec4(squaredOneMinusT * oneMinusT, //(1 - t)^3',
+                                        '3.0 * t * squaredOneMinusT,   //3t(1-t)^2,',
+                                        '3.0 * oneMinusT * squaredT,   //3(1-t)t^2',
+                                        'squaredT * t);                //t^3',
+                                    '}',
+
+                                    'vec3 evaluateCubicBezierCurve(vec3 controlPoints[4], vec4 bernsteinBasis){',
+                                        'vec3 p0_t = controlPoints[0] * bernsteinBasis.x;',
+                                        'vec3 p1_t = controlPoints[1] * bernsteinBasis.y;',
+                                        'vec3 p2_t = controlPoints[2] * bernsteinBasis.z;',
+                                        'vec3 p3_t = controlPoints[3] * bernsteinBasis.w;',
+                                        'return p0_t +  p1_t  + p2_t + p3_t;',
+                                    '}',
+
+                                    'vec3 evaluateCubicBezierSurface(vec4 rowBernsteinBasis, vec4 columnBernsteinBasis){',
+                                        'return columnBernsteinBasis.x * evaluateCubicBezierCurve(u_controlPoints0, rowBernsteinBasis) +',
+                                            'columnBernsteinBasis.y * evaluateCubicBezierCurve(u_controlPoints1, rowBernsteinBasis) +',
+                                            'columnBernsteinBasis.z * evaluateCubicBezierCurve(u_controlPoints2, rowBernsteinBasis) +',
+                                            'columnBernsteinBasis.w * evaluateCubicBezierCurve(u_controlPoints3, rowBernsteinBasis);',
+                                    '}',
+
+                                    'void main(){',
+
+                                        'v_textCoord = a_textCoord;',
+
+                                        'float s = a_textCoord.x;',
+                                        'float t = 1.0 - a_textCoord.y;',
+
+                                        'vec4 columnBernsteinBasis = computeBernsteinBasis(t);',
+                                        'vec4 rowBernsteinBasis = computeBernsteinBasis(s);',
+
+                                        'vec3 position = evaluateCubicBezierSurface(rowBernsteinBasis, columnBernsteinBasis);',
+                                        'gl_Position = u_projView * vec4(position, 1.0);',
+                                    '}'
+
+                                ].join('\n');
+
+                            var fShader =
+                                [
+                                    'precision mediump float;',
+                                    'varying vec2 v_textCoord;',
+                                    'uniform sampler2D u_colorMap;',
+                                    'void main(){',
+                                        'gl_FragColor = texture2D(u_colorMap, v_textCoord);',
+                                    '}',
+                                ].join('\n');
+                            
+                            var surfMat = new SGE.CustomMaterial();
+                            surfMat.vertexShaderSrc = vShader;
+                            surfMat.fragmentShaderSrc = fShader;
+                            surfMat.cullState = SGE.CullState.NONE;                            
+                            SGE.SimpleVariable.call(surfMat, 'u_controlPoints0', 'controlPoints0');
+                            SGE.SimpleVariable.call(surfMat, 'u_controlPoints1', 'controlPoints1');
+                            SGE.SimpleVariable.call(surfMat, 'u_controlPoints2', 'controlPoints2');
+                            SGE.SimpleVariable.call(surfMat, 'u_controlPoints3', 'controlPoints3');
+                            SGE.SimpleVariable.call(surfMat, 'u_colorMap', 'colorMap');
+                            surfMat.colorMap = colorMap;
+                                                        
+                            var surfaceControlPoints = {
+                                controlPoints0: new SGE.Vector3Array(4),
+                                controlPoints1: new SGE.Vector3Array(4),
+                                controlPoints2: new SGE.Vector3Array(4),
+                                controlPoints3: new SGE.Vector3Array(4)
+                            };
+
+                            var controlPointsHandle = new SGE.Object3D();
+                            var controlPointsMaterials =
+                                [
+                                    new SGE.makeMaterial({ color: new SGE.Vector4(1.0, 0.0, 0.0, 1.0)}),
+                                    new SGE.makeMaterial({ color: new SGE.Vector4(0.0, 1.0, 0.0, 1.0)}),
+                                    new SGE.makeMaterial({ color: new SGE.Vector4(0.0, 0.0, 1.0, 1.0)}),
+                                    new SGE.makeMaterial({ color: new SGE.Vector4(0.0, 1.0, 1.0, 1.0) })
+                                ];                            
+
+                            var surfaceControlPointsObjects = {
+                                controlPoints0: [],
+                                controlPoints1: [],
+                                controlPoints2: [],
+                                controlPoints3 : []
+                            };
+
+                            var w_2 = 10.0;
+                            var h_2 = 10.0;
+                            var w_4 = w_2 / 2.0;
+                            var h_4 = h_2 / 2.0;
+
+                            var grid = SGE.GeometryGenerator.gridGeometry(w_2 * 2.0, h_2 * 2.0, 100, 100, true);
+                            var controlPointsGeom = SGE.GeometryGenerator.sphereGeometry(w_4/10.0, 20, 20);
+
+                            for (var i = 0; i < 4; i++) {                                
+                                var name = 'controlPoints' + i;
+                                var controlPoints = surfaceControlPoints[name];
+                                var z = -h_2 + i * h_4;
+                                var j = 0;
+                                controlPoints.get(j).set(-w_2 , 0.0, z);
+                                controlPoints.get(j + 1).set(-w_4, 0.0, z);
+                                controlPoints.get(j + 2).set(+w_4, 0.0, z);
+                                controlPoints.get(j + 3).set(w_2, 0.0, z);
+                                surfMat[name] = controlPoints;
+
+                                var controlPointsObjects = surfaceControlPointsObjects[name];
+                                for (var j = 0 ; j < 4; j++) {
+                                    var obj = new SGE.Object3D(controlPointsHandle);
+                                    obj.addComponent(new SGE.MeshRendererComponent(controlPointsGeom, controlPointsMaterials[i]));
+                                    var transformComponent = obj.transformComponent;
+                                    transformComponent.position = controlPoints.get(j);
+                                    controlPointsObjects.push(transformComponent);
+                                }                                
+                            }
+                            
+                            var _2PI = Math.PI * 2.0;
+
+                            function UpdateSurfComponent() {
+                                SGE.BehaviorComponent.call(this);
+
+                                var currTime = 0.0;
+                                
+                                var amplitude = 4.0;                                
+                                var frequency = 1.0 / _2PI;
+                                var angularFrequency = 1.0;
+                                var columnPhaseDiff = Math.PI / 2.0;
+                                var rowPhaseDiff = 0.1;
+                                              
+                                var renderControlPoints = false;
+
+                                Object.defineProperties(this, {
+
+                                    amplitude: {
+                                        get: function () {
+                                            return amplitude;
+                                        },
+                                        set: function (v) {
+                                            amplitude = v;
+                                        }
+                                    },
+
+                                    frequency: {
+                                        get: function () {
+                                            return frequency;
+                                        },
+                                        set: function (v) {
+                                            frequency = v;
+                                            angularFrequency = _2PI * v;
+                                        }
+                                    },
+
+                                    rowPhaseDiff : {
+                                        get: function () {
+                                            return SGE.Utils.radianToDeg(rowPhaseDiff);
+                                        },
+                                        set: function (v) {
+                                            rowPhaseDiff = SGE.Utils.degToRadian(v);
+                                        }
+                                    },
+
+                                    columnPhaseDiff : {
+                                        get: function () {
+                                            return SGE.Utils.radianToDeg(columnPhaseDiff);
+                                        },
+                                        set: function (v) {
+                                            columnPhaseDiff = SGE.Utils.degToRadian(v);
+                                        }
+                                    },
+
+                                    renderControlPoints : {
+                                        get: function () {
+                                            return renderControlPoints;
+                                        },
+                                        set: function (v) {
+                                            if (v == renderControlPoints)
+                                                return;
+                                            renderControlPoints = v;
+                                            if(v)
+                                                scene.add(controlPointsHandle);
+                                            else
+                                                scene.remove(controlPointsHandle);
+                                        }
+                                    },
+
+                                    update: {
+                                        value: function (dt) {
+                                            currTime += dt / 1000.0;
+                                            
+                                            var t = angularFrequency * currTime;                                            
+                                            
+                                            if(!renderControlPoints)
+                                                for (var i = 0; i < 4; i++) {
+                                                    var name = 'controlPoints' + i;
+                                                    var controlPoints = surfaceControlPoints[name];
+                                                    var rowPhase = t + i * rowPhaseDiff;
+                                                    for (var j = 0 ; j < 4; j++)                                                        
+                                                        controlPoints.get(j).y = amplitude * Math.sin( rowPhase + j * columnPhaseDiff );
+                                                    surfMat[name] = controlPoints;
+                                                }
+                                            else {
+                                                for (var i = 0; i < 4; i++) {
+                                                    var name = 'controlPoints' + i;
+                                                    var controlPoints = surfaceControlPoints[name];
+                                                    var controlPointsObjects = surfaceControlPointsObjects[name];
+                                                    var rowPhase = t + i * rowPhaseDiff;
+                                                    for (var j = 0 ; j < 4; j++) {
+                                                        var controlPoint = controlPoints.get(j);
+                                                        controlPoint.y = amplitude * Math.sin(rowPhase + j * columnPhaseDiff );
+                                                        controlPointsObjects[j].position = controlPoint;
+                                                    }
+                                                    surfMat[name] = controlPoints;
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                            UpdateSurfComponent.prototype = SGE.BehaviorComponent.prototype;
+                            
+                            var obj = new SGE.Object3D();
+                            obj.addComponent(new SGE.MeshRendererComponent(grid, surfMat));
+                            var updateComp = new UpdateSurfComponent();
+                            obj.addComponent(updateComp);
+                            scene.add(obj);
+
+                            var gui = new dat.GUI();
+                            gui.add(updateComp, 'amplitude', 1.0, 15.0);
+                            gui.add(updateComp, 'frequency', 0.1, 3.0);                            
+                            gui.add(updateComp, 'columnPhaseDiff', 0.0, 360.0).name('Columns phase difference');
+                            gui.add(updateComp, 'rowPhaseDiff', 0.0, 360.0).name('Rows phase difference');
+                            gui.add(updateComp, 'renderControlPoints');
+                            
+                            var quality = {
+                                minificationFilter: colorMap.minification,
+                                magnificationFilter : colorMap.magnification
+                            };
+
+                            var values = [];
+                            for (var key in SGE.TextureFilter) {
+                                var intValue = SGE.TextureFilter[key];
+                                values[intValue] = intValue;
+                            }          
+
+                            var qualityFolder = gui.addFolder('quality');
+
+                            qualityFolder.add(quality, 'minificationFilter', SGE.TextureFilter).onChange(function (value) {
+                                colorMap.minification = values[value];
+                            });
+
+                            var allowedMagnification = {
+                                NEAREST: SGE.TextureFilter.NEAREST,
+                                LINEAR: SGE.TextureFilter.LINEAR
+                            };
+
+                            qualityFolder.add(quality, 'magnificationFilter', allowedMagnification).onChange(function (value) {
+                                colorMap.magnification = values[value];
+                            });
+
+                            
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

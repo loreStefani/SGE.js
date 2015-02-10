@@ -1,0 +1,365 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', 'libs/jquery', '../examples/js/DemoUtils'], function (SGE, $, DemoUtils) {
+
+            'use strict';
+            
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+                var colorMap;
+                var currWidth;
+                var currHeight;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/691.jpg');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            colorMap = SGE.createTexture(images[0]);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 250.0 });
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);
+                            var cameraTransformComponent = cameraObject.transformComponent;                            
+                            scene.add(cameraObject);
+
+                            function computeBernsteinBasis(t, out) {
+                                var oneMinusT = 1.0 - t;
+                                var squaredOneMinusT = oneMinusT * oneMinusT;
+                                var squaredT = t * t;
+                                out.set(
+                                    squaredOneMinusT * oneMinusT, //(1 - t)^3
+                                    3.0 * t * squaredOneMinusT,   //3t(1-t)^2,
+                                    3.0 * oneMinusT * squaredT,   //3(1-t)t^2
+                                    squaredT * t                  // t^3
+                                    );
+                            }
+
+                            function CubicBezierCurve() {
+                                this.p0 = new SGE.Vector3();
+                                this.p1 = new SGE.Vector3();
+                                this.p2 = new SGE.Vector3();
+                                this.p3 = new SGE.Vector3();
+                                this.bernsteinBasis = new SGE.Vector4();
+
+                                this.getValue = (function () {
+
+                                    var p0_t = new SGE.Vector3();
+                                    var p1_t = new SGE.Vector3();
+                                    var p2_t = new SGE.Vector3();
+                                    var p3_t = new SGE.Vector3();
+
+                                    return function (t, out) {
+                                        var bernsteinBasis = this.bernsteinBasis;
+                                        computeBernsteinBasis(t, bernsteinBasis);
+
+                                        p0_t.fromVector3(this.p0).scale(bernsteinBasis.x);
+                                        p1_t.fromVector3(this.p1).scale(bernsteinBasis.y);
+                                        p2_t.fromVector3(this.p2).scale(bernsteinBasis.z);
+                                        p3_t.fromVector3(this.p3).scale(bernsteinBasis.w);
+
+                                        out.fromVector3(p0_t).add(p1_t).add(p2_t).add(p3_t);
+                                    };
+
+                                })();
+                            }
+
+                            function CubicBezierSurface() {
+
+                                this.q0 = new CubicBezierCurve();
+                                this.q1 = new CubicBezierCurve();
+                                this.q2 = new CubicBezierCurve();
+                                this.q3 = new CubicBezierCurve();
+
+                                this.bernsteinBasis = new SGE.Vector4();
+
+                                this.getValue = (function () {
+
+                                    var q0_s = new SGE.Vector3();
+                                    var q1_s = new SGE.Vector3();
+                                    var q2_s = new SGE.Vector3();
+                                    var q3_s = new SGE.Vector3();
+
+                                    return function (s, t, out) {
+                                        var bernsteinBasis = this.bernsteinBasis;
+                                        computeBernsteinBasis(t, bernsteinBasis);
+
+                                        this.q0.getValue(s, q0_s);
+                                        this.q1.getValue(s, q1_s);
+                                        this.q2.getValue(s, q2_s);
+                                        this.q3.getValue(s, q3_s);
+
+                                        q0_s.scale(bernsteinBasis.x);
+                                        q1_s.scale(bernsteinBasis.y);
+                                        q2_s.scale(bernsteinBasis.z);
+                                        q3_s.scale(bernsteinBasis.w);
+
+                                        out.fromVector3(q0_s).add(q1_s).add(q2_s).add(q3_s);
+                                    };
+
+                                })();
+                            }
+
+                            var w_2 = 10.0;
+                            var h_2 = 10.0;
+                            var w_4 = w_2 / 2.0;
+                            var h_4 = h_2 / 2.0;
+
+                            var controlPointGeom = SGE.GeometryGenerator.sphereGeometry(w_4 / 25.0, 10, 10);
+                            var surfaceGeom = SGE.GeometryGenerator.gridGeometry(w_2 * 2.0, h_2 * 2.0, 100, 100, true);
+                            surfaceGeom.usage = SGE.Usage.DYNAMIC;
+                            
+                            var controlPointColors = [
+                                new SGE.Vector4(1.0, 0.0, 0.0, 1.0),
+                                new SGE.Vector4(0.0, 1.0, 0.0, 1.0),
+                                new SGE.Vector4(0.0, 0.0, 1.0, 1.0),
+                                new SGE.Vector4(0.0, 1.0, 1.0, 1.0)
+                            ];
+                            var controlPointClickedColor = new SGE.Vector4(1.0, 0.0, 1.0, 1.0);
+                            
+                            var controlPoints = new SGE.Vector3Array(16);                            
+                            var surface = new CubicBezierSurface();
+                            var controlPointObjects = [];
+
+                            var startY = -w_2;
+                            var stepY = w_4 / 2;
+                            for (var i = 0, j = 0 ; i < 4; i++, j += 4) {                                
+                                var z = -h_2 + i * h_4;
+                                var y = startY + i * stepY;
+                                controlPoints.get(j).set(-w_2, 0.0, z);
+                                controlPoints.get(j + 1).set(-w_4, y, z);
+                                controlPoints.get(j + 2).set(+w_4, -y, z);
+                                controlPoints.get(j + 3).set(w_2, 0.0, z);
+                                
+                                var curve = surface['q' + i];
+                                var color = controlPointColors[i]; 
+                                
+                                for (var k = 0; k < 4; k++) {
+                                    var controlPoint = controlPoints.get(j + k);
+
+                                    var pi = curve['p' + k];
+                                    pi.fromVector3(controlPoint);
+
+                                    var obj = new SGE.Object3D();
+                                    var mat = SGE.makeMaterial({
+                                        color: color
+                                    });
+                                    obj.addComponent(new SGE.MeshRendererComponent(controlPointGeom, mat));
+                                    var transformComponent = obj.transformComponent;
+                                    transformComponent.position = controlPoint;
+                                    scene.add(obj);
+
+                                    controlPointObjects.push({
+                                        transformComponent: transformComponent,                                        
+                                        controlPoint: pi,
+                                        material: mat,
+                                        color : color
+                                    });
+                                }                                
+                            }
+
+                            var vBuff = surfaceGeom.vertexBuffer;
+                            var dataMap = vBuff.dataMap;
+                            var textCoords = dataMap.a_textCoord;
+                            var vertexCount = vBuff.vertexCount;
+                            var positions = new SGE.Vector3Array(vertexCount);
+
+                            function buildSurface() {
+                                for (var i = 0 ; i < vertexCount; i++) {
+                                    var textCoordsIndex = i * 2;
+                                    var s = textCoords[textCoordsIndex];
+                                    var t = textCoords[textCoordsIndex + 1];
+                                    surface.getValue(s, 1.0 - t, positions.get(i));
+                                }
+
+                                dataMap.a_position = positions.data;
+                                vBuff.build();
+                            }
+
+                            buildSurface();
+
+                            var surfaceObject = new SGE.Object3D();
+                            var surfaceMaterial = SGE.makeMaterial({ colorMap: colorMap, cullState : SGE.CullState.NONE });                            
+                            surfaceObject.addComponent(new SGE.MeshRendererComponent(surfaceGeom, surfaceMaterial));
+                            scene.add(surfaceObject);
+                                                        
+                            var clicked = null;
+                            
+                            var boundSphere = new SGE.Sphere();
+                            var pointBounds = controlPointGeom.bounds;
+                            $(document.body).mousedown(function (evt) {
+
+                                if (evt.which != 1)
+                                    return;
+                                
+                                var cameraProjView = camera.projectionView;
+                                cameraProjView.getRow(2, projRow2);
+                                cameraProjView.getRow(3, projRow3);
+                                controlPointObjects.sort(sortControlPoints);
+
+                                var ray = computeWorldRay(evt.pageX, evt.pageY);
+
+                                clicked = null;
+
+                                for (var i = 0; i < 16; i++) {
+                                    var desc = controlPointObjects[i];
+
+                                    boundSphere.fromSphere(pointBounds);
+                                    boundSphere.transformByMatrix4(desc.transformComponent.localTransform);
+
+                                    if (ray.intersectSphere(boundSphere) != null) {
+                                        clicked = desc;
+                                        clicked.material.color = controlPointClickedColor;
+                                        evt.preventDefault();
+                                        break;
+                                    }
+                                }                                
+                            });
+
+                            var projRow2 = new SGE.Vector4();
+                            var projRow3 = new SGE.Vector4();
+
+                            var worldToNDCZ = (function () {
+                                var v = new SGE.Vector4();
+                                return function (controlPointObject) {
+                                    v.pointFromVector3(controlPointObject.transformComponent.position);
+                                    return projRow2.dot(v) / projRow3.dot(v);
+                                };
+                            })();
+
+                            function sortControlPoints(p1, p2) {
+                                return worldToNDCZ(p1) - worldToNDCZ(p2);
+                            }                                                       
+                            
+                            var computeWorldRay = (function () {
+
+                                function viewPortToNDCX(x, viewPortWidth) {
+                                    //[0, viewPortWidth] => [-1, 1]
+                                    return x * 2 / viewPortWidth - 1.0;
+                                }
+
+                                function viewPortToNDCY(y, viewPortHeight) {
+                                    //[0, viewPortHeight] => [1, -1] 
+                                    return 1.0 - (y * 2) / viewPortHeight;
+                                }
+
+                                //aspect*tan(fovY/2)
+                                var invP00;
+                                //tan(fovY/2)
+                                var invP11;
+
+                                function onProjChanged() {
+                                    var projection = camera.projection.data;
+                                    invP00 = 1.0 / projection[0];
+                                    invP11 = 1.0 / projection[5];
+                                }
+
+                                onProjChanged();                               
+                                camera.addEventListener('projectionChanged', onProjChanged);
+
+                                function ndcToProjectedView(ndcPoint, out) {                                    
+                                    out.x = ndcPoint.x * invP00;
+                                    out.y = ndcPoint.y * invP11;
+                                    return out;
+                                }
+
+                                var ndcDir = new SGE.Vector4();                                
+                                var ray = new SGE.Ray();
+                                var cameraTransformComponent = cameraObject.transformComponent;
+                                return function (clickX, clickY) {
+
+                                    //viewport to ndc
+                                    var x_ndc = viewPortToNDCX(clickX, currWidth);
+                                    var y_ndc = viewPortToNDCY(clickY, currHeight);
+
+                                    //ray direction in ndc
+                                    ndcDir.set(x_ndc, y_ndc, -1.0, 0.0);
+                                    //transform to view space
+                                    var viewDir = ndcToProjectedView(ndcDir, ndcDir);
+
+                                    ray.origin = cameraTransformComponent.worldPosition;
+
+                                    //worlTransform is the viewTransform inverse
+                                    viewDir.transformMat4(cameraTransformComponent.worldTransform);
+
+                                    ray.direction = ray.direction.fromVector4(viewDir);
+                                    
+                                    return ray;
+                                };
+                            })();                            
+
+                            $(document.body).mousemove(function(){
+                                var movePlane = new SGE.Plane();
+                                var planeNormal = new SGE.Vector3();
+
+                                return function (evt) {
+                                
+                                    if (clicked == null)
+                                        return;
+
+                                    var ray = computeWorldRay(evt.pageX, evt.pageY);
+
+                                    //move the control point on the plane parallel to the camera 'near plane' which the point lies on
+                                    var point = clicked.transformComponent.position;
+                                    planeNormal.fromVector3(cameraTransformComponent.forward).negate();                                    
+                                    movePlane.fromPointNormal(point, planeNormal);
+
+                                    var t = ray.intersectPlane(movePlane);                                    
+                                    ray.getPoint(t, point);
+                                    clicked.transformComponent.position = point;
+                                };
+                            }());
+
+                            $(document.body).mouseup(function (evt) {                                
+                                if (clicked == null)
+                                    return;
+
+                                clicked.material.color = clicked.color;
+                                clicked.controlPoint.fromVector3(clicked.transformComponent.position);
+                                clicked = null;
+                                buildSurface();
+                            });
+
+                            cameraObject.addComponent(new DemoUtils.SphereView());
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                            currWidth = width;
+                            currHeight = height;
+                        }
+                    }
+                });
+            });
+           
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

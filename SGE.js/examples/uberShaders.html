@@ -1,0 +1,63 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <style>
+
+        .title{
+            text-align: center;
+        }
+
+        .source{
+            text-align : left;
+        }
+    </style>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>        
+    <script type="text/javascript">
+
+        requirejs(['SGE', 'libs/jquery'], function (SGE, $) {
+
+            'use strict';
+                                    
+            $(document).ready(function () {
+
+                var shaderSources = [
+                'genericVertexShader',
+                'genericFragmentShader',
+                'depthVertex',
+                'depthFragment',
+                'skyBoxVertex',
+                'skyBoxFragment',
+                'postEffectVertex'
+                ];
+
+                var names = [
+                    'Vertex Shader',
+                    'Fragment Shader',
+                    'Depth Vertex Shader',
+                    'Depth Fragment Shader',
+                    'SkyBox Vertex Shader',
+                    'SkyBox Fragment Shader',
+                    'Post-Effect Vertex Shader'
+                ];
+                                
+                function create(i) {
+                    return $('<p>', { class: 'title' }).text(names[i]).append(
+                        $('<pre>', {class : 'source'}).text(SGE.Programs.ShaderSources[shaderSources[i]])
+                        );
+                }
+
+                var domElement = document.body;
+                var count = shaderSources.length;
+                for (var i = 0; i < count; i++)
+                    $(domElement).append(create(i));                
+            }); 
+            
+        });
+
+    </script>
+
+</body>
+</html>

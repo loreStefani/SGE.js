@@ -1,0 +1,295 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>        
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    
+    <script type="text/javascript">    
+    
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+            
+            var MyApp = DemoUtils.DemoInit(function() {
+            
+                var imageFolder = 'Textures/';
+
+                var images = [
+                    'william_wall_01_D.png',
+                    'william_wall_01_N.png',
+                    'william_wall_01_S.png',
+                    'crate.gif',
+                    'crate_NRM.jpg',
+                    'crate_SPEC.jpg'
+                ];
+
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+
+                var wallDiff;
+                var wallBump;
+                var wallSpec;
+                var boxDiff;
+                var boxBump;
+                var boxSpec;
+                var camera;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            wallDiff = SGE.createTexture(images[0]);
+                            wallBump = SGE.createTexture(images[1]);
+                            wallSpec = SGE.createTexture(images[2]);
+                            boxDiff = SGE.createTexture(images[3]);
+                            boxBump = SGE.createTexture(images[4]);
+                            boxSpec = SGE.createTexture(images[5]);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                            
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });                            
+                            var cameraObject = new SGE.Object3D();                            
+                            cameraObject.addComponent(camera);
+                            scene.add(cameraObject);
+                            cameraObject.transformComponent.y = 1.1;
+                            cameraObject.addComponent(new DemoUtils.FPSMove(1.0 / 8.0));
+                            cameraObject.addComponent(new DemoUtils.FreeView());                            
+
+                            var w = 5.0;
+                            var d = w * 10.0;
+                            var halfW = w / 2.0;
+                            var halfD = d / 2.0;
+                            var groundGeom = SGE.GeometryGenerator.gridGeometry(w, d, 50, 50, true, true, true);
+                            cameraObject.addComponent(new DemoUtils.BoxConstrainer(-halfW, halfW, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, -halfD, halfD + d));
+                            
+                            var enabledCount = 0;
+                            function addSpotLight(gui, parent, position, enabled) {
+                                var lightObject = new SGE.Object3D(parent);
+                                var spot = new SGE.SpotLight(new SGE.Vector2(512, 512), -0.005);
+                                lightObject.addComponent(spot);
+                                lightObject.transformComponent.position = position;
+                                spot.color = new SGE.Vector4(1.0, 1.0, 0.2, 1.0);
+                                spot.attenuation = new SGE.Vector3(0.001, 0.499, 0.001);
+                                spot.spot = 90.0;                                                                
+                                spot.castShadows = true;
+                                var state = {
+                                };
+                                
+                                Object.defineProperties(state, {                                    
+                                    enabled: {
+                                        get: function () {
+                                            return enabled;
+                                        },
+                                        set: function (v) {
+                                            enabled = v;
+                                            if (v) {
+                                                scene.add(lightObject);
+                                                enabledCount++;
+                                            }
+                                            else {
+
+                                                if (enabledCount == 1) {
+                                                    enabled = true;
+                                                    return;
+                                                }
+                                                
+                                                scene.remove(lightObject);
+                                                enabledCount--;
+                                            }
+                                        }
+                                    }
+                                });
+
+                                gui.add(state, 'enabled');                                
+                                gui.add(spot, 'spot', 8.0, 800.0);
+                                new DemoUtils.ColorController(gui, spot, 'color');
+                                new DemoUtils.Vector3Controller(gui, spot, 'attenuation', ['constant', 'distance', 'squaredDistance'], [0.0, 0.0, 0.0], [10.0, 10.0, 10.0]);
+                                var shadowsFolder = gui.addFolder('shadows');
+                                new DemoUtils.ShadowController(shadowsFolder, spot);                                
+                                var lightCamera = spot.lightCamera;
+                                lightCamera.fovY = Math.PI / 2.0;
+                                lightCamera.near = 0.1;
+                                lightCamera.far = d;                                
+                                state.enabled = enabled;
+
+                                return spot;
+                            }
+                            
+                            var gui = new dat.GUI();
+                            var lightFolder = gui.addFolder('light1');
+                            var spotLight1 = addSpotLight(lightFolder, cameraObject, new SGE.Vector3(0.5, 0.0, 0.0), true);                            
+                            var lightFolder1 = gui.addFolder('light2');
+                            var spotLight2 = addSpotLight(lightFolder1, null, new SGE.Vector3(0.0, halfW *3/2, halfD + d), false);                            
+                            spotLight2.direction = new SGE.Vector3(0.0, -0.5, -1.0);                            
+                            var lightFolder2 = gui.addFolder('light3');
+                            var spotLight3 = addSpotLight(lightFolder2, null, new SGE.Vector3(0.0, halfW * 3/2, -halfD), false);
+                            spotLight3.direction = new SGE.Vector3(0.0, -0.5, 1.0);
+
+                            var transform = new SGE.Matrix3().scale(new SGE.Vector3(w, d, 1.0));
+                            var tunnelMatParams = {
+                                colorMap: wallDiff,                                
+                                textCoordTransform: transform,
+                                receiveLight: true, receiveShadows: true,
+                                ambient: new SGE.Vector4(0.1, 0.1, 0.1, 1.0),
+                                diffuse: new SGE.Vector4(0.8, 0.8, 0.4, 1.0),
+                                specular: new SGE.Vector4(0.2, 0.4, 0.1, 9.0),
+                            };
+                            var tunnelMat = SGE.makeMaterial(tunnelMatParams);
+                            var tunnelMatRebuilder = new DemoUtils.SingleMaterialRebuilder(tunnelMat, tunnelMatParams);
+                            var tunnelRenderComponents = tunnelMatRebuilder.renderComponents;
+
+                            function addTunnel() {
+
+                                var tunnel = new SGE.Object3D();                                
+
+                                var ceiling = new SGE.Object3D(tunnel);
+                                ceiling.transformComponent.rotateZ(Math.PI).translateY(w);
+                                var renderComponent = new SGE.MeshRendererComponent(groundGeom, tunnelMat);
+                                ceiling.addComponent(renderComponent);
+                                tunnelRenderComponents.push(renderComponent);
+
+                                var ground = new SGE.Object3D(tunnel);
+                                renderComponent = new SGE.MeshRendererComponent(groundGeom, tunnelMat);
+                                ground.addComponent(renderComponent);
+                                tunnelRenderComponents.push(renderComponent);
+
+                                var left = new SGE.Object3D(tunnel);
+                                left.transformComponent.rotateZ(-Math.PI * 0.5).translateX(-halfW).translateY(halfW);
+                                renderComponent = new SGE.MeshRendererComponent(groundGeom, tunnelMat);
+                                left.addComponent(renderComponent);
+                                tunnelRenderComponents.push(renderComponent);
+
+                                var right = new SGE.Object3D(tunnel);
+                                right.transformComponent.rotateZ(Math.PI * 0.5).translateX(halfW).translateY(halfW);
+                                renderComponent = new SGE.MeshRendererComponent(groundGeom, tunnelMat);
+                                right.addComponent(renderComponent);
+                                tunnelRenderComponents.push(renderComponent);
+
+                                scene.add(tunnel);
+                                return tunnel;
+                            }
+
+                            var firstTunnel = addTunnel();
+                            var secondTunnel = addTunnel();
+                            secondTunnel.transformComponent.translateZ(d);
+
+                            var boxSize = w / 6.0;
+                            var boxGeom = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize, true, true, true);
+                            var boxMatParams = {
+                                colorMap: boxDiff,                                
+                                receiveLight: true,
+                                ambient: new SGE.Vector4(0.1, 0.1, 0.1, 1.0),
+                                diffuse: new SGE.Vector4(0.8, 0.8, 0.1, 1.0),
+                                specular: new SGE.Vector4(0.2, 0.2, 0.2, 9.0),
+                                receiveShadows: true
+                            };
+                            var boxMat = SGE.makeMaterial(boxMatParams);
+                            var boxMatRebuilder = new DemoUtils.SingleMaterialRebuilder(boxMat, boxMatParams);
+                            var boxRenderComponents = boxMatRebuilder.renderComponents;
+
+                            function addBox(position) {
+                                var box = new SGE.Object3D();
+                                box.transformComponent.position = position;
+                                var renderComponent = new SGE.MeshRendererComponent(boxGeom, boxMat, null, true);
+                                box.addComponent(renderComponent);
+                                boxRenderComponents.push(renderComponent);
+                                scene.add(box);
+                            }
+                                                        
+                            var boxesBoundW = w - boxSize;
+                            var boxesBoundD = 2 * (d - boxSize);                            
+                            var halfBoxesBoundD = boxesBoundD / 2.0;
+                            var halfBoxSize = boxSize / 2.0;
+                            var maxStackSizeMinusOne = Math.floor(boxesBoundW / boxSize) - 1;
+
+                            function addBoxStack(x, z) {
+                                var stack = (Math.random() * (maxStackSizeMinusOne)) + 1;                                
+                                for (var i = 0; i < stack; i++)
+                                    addBox(new SGE.Vector3(x, halfBoxSize + boxSize * i, z));
+                            }
+                                                        
+                            var zMin = -halfD + 4 * boxSize;
+                            var zMax = d + halfD - 4 * boxSize;
+                            var xMin = -halfW + halfBoxSize;                            
+
+                            addBoxStack(boxSize, zMin);
+                            addBoxStack(-boxSize, zMin);
+
+                            addBoxStack(boxSize, zMax);
+                            addBoxStack(-boxSize, zMax);
+                            
+                            var maxSpanMinusOne = d / 5.0 - 1;
+
+                            function addSpan() {                        
+                                var span = (Math.random() * (maxSpanMinusOne)) + 1;
+                                currZ += boxSize * span;
+                            }
+
+                            zMin += 4 * boxSize;
+                            zMax -= 4 * boxSize;
+                            var currZ = zMin;                            
+                            while (currZ < zMax) {                                
+                                addBoxStack((Math.random() * boxesBoundW) + xMin, currZ);
+                                addSpan();
+                            }
+                            
+                            scene.ambientLight = new SGE.Vector4(0.2, 0.2, 0.2, 1.0);
+                            new DemoUtils.ColorController(gui.addFolder('scene'), scene, 'ambientLight');
+                                                        
+                            var tunnelMaterialController = new DemoUtils.LitMaterialController(gui.addFolder('tunnelMaterial'), tunnelMat);                                                        
+                            var boxMaterialController = new DemoUtils.LitMaterialController(gui.addFolder('boxMaterial'), boxMat);
+
+                            var quality = {
+                                tunnelBumpMap: false,
+                                tunnelSpecMap: false,
+                                boxBumpMap: false,
+                                boxSpecMap: false,
+                                softShadows : false
+                            };
+                            
+                            var qualityFolder = gui.addFolder('quality');
+                            qualityFolder.add(quality, 'tunnelBumpMap').onChange(tunnelMatRebuilder.makeBooleanListener('bumpMap', wallBump, tunnelMaterialController));
+                            qualityFolder.add(quality, 'tunnelSpecMap').onChange(tunnelMatRebuilder.makeBooleanListener('specMap', wallSpec, tunnelMaterialController));
+                            qualityFolder.add(quality, 'boxBumpMap').onChange(boxMatRebuilder.makeBooleanListener('bumpMap', boxBump, boxMaterialController));
+                            qualityFolder.add(quality, 'boxSpecMap').onChange(boxMatRebuilder.makeBooleanListener('specMap', boxSpec, boxMaterialController));
+                            qualityFolder.add(quality, 'softShadows').onChange((function () {
+                                var tunnelListener = tunnelMatRebuilder.makeBooleanListener('pcf', true, tunnelMaterialController);
+                                var boxListener = boxMatRebuilder.makeBooleanListener('pcf', true, boxMaterialController);
+                                return function (set) {
+                                    tunnelListener(set);
+                                    boxListener(set);
+                                };
+                            })());
+
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+            new SGE.Engine({ stats: true}).run(new MyApp(),{backGroundColor : new SGE.Vector4(0.0, 0.0, 0.0, 1.0)});
+        });
+
+    </script>
+
+</body>
+</html>

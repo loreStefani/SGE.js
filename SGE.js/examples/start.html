@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <style>
+
+        body {
+            margin: 0;
+            overflow: scroll;
+        }
+        .element {            
+            color: red;            
+            outline-style: solid;
+            outline-color:black;
+            font-size:150%;
+            text-align: center;
+            text-transform: capitalize;
+            position: absolute;  
+            cursor:pointer;          
+        }
+        
+        .element:hover {
+            animation-name: anim;
+            animation-duration: 1s;
+            animation-iteration-count: infinite;
+            -webkit-animation-name: anim;
+            -webkit-animation-duration: 1s;
+            -webkit-animation-iteration-count: infinite;
+            outline-color: red;
+        }
+
+        @keyframes anim {
+            50% {                
+                transform : scale(0.9,0.9)                
+            }
+
+            100% {
+                transform : none;
+            }
+        }
+
+        @-webkit-keyframes anim {
+            50% {
+                transform: scale(0.9,0.9);
+            }
+
+            100% {
+                transform: none;
+            }
+        }
+
+        .container{
+            width:100%;
+            height:100%;
+            padding:0;
+            margin:0;
+            left:0;
+            top:0;
+            position: absolute;
+        }
+
+    </style>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>    
+    <script type="text/javascript">
+        
+        requirejs(['loaders/ImageLoader', 'libs/jquery', '../examples/js/spin'], function (ImageLoader, $, Spinner) {
+                    
+            var examples = [
+                'bumpMap',
+                'celShading',                
+                'culling',
+                'contextLost',
+                'displMap',
+                'envMap',
+                'fog',
+                'gpuBezier',                
+                'hierarchy',
+                'lod',                
+                'multiViews',
+                'normals',
+                'particles',
+                'picking',
+                'pointLights',
+                'postEffect',
+                'renderSorting',
+                'shadows',
+                'skinning',
+                'spotLights'                
+            ];
+
+            var backGrounds = [
+            ];
+                       
+            examples.forEach(function (v, i) {
+                backGrounds[i] = 'Textures/' + examples[i] + '.png';
+            });
+            
+            var count = examples.length;
+            var perRowCount = 2;
+            var outlineWidth = 4;
+            var aspect = 2;
+            var elements = [];
+                        
+            var spinner = new Spinner().spin(document.body);
+            
+            ImageLoader.load(backGrounds, function () {
+
+                var container = $('<div>', { class: 'container' });
+
+                for (var i = 0; i < count; i++) {
+                    (function () {
+                        var name = examples[i];
+                        var el = $('<h1>', { class: 'element', text: name }).css({
+                            'outline-width': outlineWidth + 'px', margin: 0, padding: 0,
+                            'background-image': 'url(' + backGrounds[i]+ ')', 'background-size': '100% 100%'
+                        }).click(function () {
+                            window.location.assign(name + '.html');
+                        }).hide();
+                        container.append(el);
+                        elements.push(el);
+                    })();
+                }
+
+                function resize() {
+                    var w = container.width() - 2 * perRowCount * outlineWidth;
+                    var h = container.height();
+                    var elementsW = w / perRowCount;
+                    var elementsH = elementsW / aspect;
+
+                    for (var i = 0; i < count; i++) {
+                        var left = (elementsW + 2 * outlineWidth) * (i % 2) + outlineWidth;
+                        var top = (elementsH + 2 * outlineWidth) * Math.floor(i / 2) + outlineWidth;
+                        elements[i].css({ width: elementsW + 'px', height: elementsH + 'px', left: left + 'px', top: top + 'px' });
+                    }
+                }
+                
+                spinner.stop();
+                $('body').append(container);
+
+                resize();
+                $(window).resize(resize);
+
+                function fadeNext(i) {
+                    return function () {
+                        var onFadeIn = null;
+                        if (i != count - 1)
+                            onFadeIn = fadeNext(i + 1);
+                        elements[i].fadeIn('fast', onFadeIn);
+                    };
+                }
+
+                fadeNext(0)();
+            });
+            
+        });
+
+    </script>
+</body>
+</html>

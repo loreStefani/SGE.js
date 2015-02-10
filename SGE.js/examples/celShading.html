@@ -1,0 +1,240 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>        
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+        
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function() {
+                                
+                var camera;
+
+                Object.defineProperties(this, {
+                                        
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 250.0 });                            
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                                                        
+                            scene.add(cameraObject);
+                            
+                            //First pass
+                            var toonVShader = [
+                                'attribute vec3 a_position;',
+                                'attribute vec3 a_normal;',
+
+                                'uniform mat4 u_world;',
+                                'uniform mat4 u_projView;',
+                                                                
+                                'varying vec3 v_normal;',
+
+                                'void main(){',
+                                    'vec4 worldPos = u_world * vec4(a_position, 1.0);',                                    
+                                    'vec4 worldNormal = u_world * vec4(a_normal, 0.0);',                                                                                                        
+                                    'v_normal = worldNormal.xyz;',
+                                    'gl_Position = u_projView * worldPos;',
+                                '}'
+                            ].join('\n');
+                                                        
+                            var toonFshader = [
+                                'precision mediump float;',
+                                'uniform sampler2D u_colorPalette;',
+                                'uniform vec3 u_lightDirection;',                                
+                                'varying vec3 v_normal;',
+                                'void main(){',
+                                    'float dot = max(dot(-u_lightDirection, normalize(v_normal)), 0.0);',                                    
+                                    'vec2 textCoord = vec2(dot, 0.0);',
+                                    'gl_FragColor = texture2D(u_colorPalette, textCoord);',
+                                '}'
+                            ].join('\n');
+
+                            var paletteParameters = {
+                                magnification: SGE.TextureFilter.NEAREST,
+                                minification: SGE.TextureFilter.NEAREST, wrapS: SGE.TextureWrapMode.CLAMP_TO_EDGE, wrapT: SGE.TextureWrapMode.CLAMP_TO_EDGE
+                            };
+
+                            var unlitColorScale = 1.0 / 5.0;
+
+                            function generatePalette(texture) {
+
+                                var palette = [];
+
+                                //RGB lit
+                                for (var j = 4 ; j < 7 ; j++)
+                                    palette[j] = (Math.floor(Math.random() * 255));
+
+                                //RGB unlit
+                                for (var j = 0 ; j < 3; j++)
+                                    palette[j] = palette[j + 4] *unlitColorScale;
+
+                                //Alpha
+                                palette[3] = 255;
+                                palette[7] = 255;
+
+                                palette = new Uint8Array(palette);
+                                if(texture == null)
+                                    return SGE.createTexture(palette, 2, 1, paletteParameters);
+                                texture.imageData = palette;
+                                return texture;
+                            }
+                                                        
+                            //Second pass
+                            var silhouetteVshader = [
+                                'attribute vec3 a_position;',
+                                'attribute vec3 a_normal;',
+
+                                'uniform mat4 u_world;',
+                                'uniform mat4 u_projView;',
+
+                                'uniform vec3 u_eyePosition;',
+
+                                'uniform float u_thickness;',
+                                                                
+                                'void main(){',
+                                    'vec4 worldPos = u_world * vec4(a_position, 1.0);',
+                                    'vec4 worldNormal = u_world * vec4(a_normal, 0.0);',                                   
+                                                                        
+                                    'worldPos += u_thickness * worldNormal;',
+                                    'gl_Position = u_projView * worldPos;',
+                                '}'
+                            ].join('\n');
+
+                            var silhouetteFshader = [
+                                'precision mediump float;',
+                                'void main(){',
+                                    'gl_FragColor = vec4(0.0,0.0,0.0,1.0);',
+                                '}'
+                            ].join('\n');
+
+                            //create one shared instance
+                            var silhouetteMat = new SGE.CustomMaterial();
+                            silhouetteMat.vertexShaderSrc = silhouetteVshader;
+                            silhouetteMat.fragmentShaderSrc = silhouetteFshader;
+                            silhouetteMat.cullState = SGE.CullState.FRONT;
+                            SGE.Materials.SimpleVariable.call(silhouetteMat, 'u_thickness', 'thickness');
+                            silhouetteMat.thickness = 0.355;
+
+                            var gui = new dat.GUI();
+                            gui.add(silhouetteMat, 'thickness', 0.0, 3.0);
+
+                            var radius = 5.0;
+                            var boxSize = radius * 2.0;
+                            cameraObject.addComponent(new DemoUtils.SphereView(null, null, null, radius*10.0));
+                            var meshes = [
+                                SGE.GeometryGenerator.sphereGeometry(radius, 50, 50, false, true),
+                                SGE.GeometryGenerator.cilynderGeometry(radius, radius / 2.0, radius, 50, 50, false, true),
+                                SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize, false, true)                                
+                            ];
+                            
+                            var meshCount = meshes.length;
+                            var materials = [];  
+                            
+                            var span = 4.0 * radius;
+                            var startX = -Math.floor(meshCount / 2) * span;
+                            for (var i = 0 ; i < meshCount; i++) {
+
+                                var obj = new SGE.Object3D();
+
+                                var toonMat = new SGE.CustomMaterial();
+                                toonMat.vertexShaderSrc = toonVShader;
+                                toonMat.fragmentShaderSrc = toonFshader;
+                                SGE.Materials.SimpleVariable.call(toonMat, 'u_lightDirection', 'lightDirection');
+                                SGE.Materials.SimpleVariable.call(toonMat, 'u_colorPalette', 'colorPalette');
+                                toonMat.lightDirection = new SGE.Vector3();                                
+
+                                materials.push(toonMat);
+                                                                
+                                var multiPassRendererComponent = new SGE.MeshRendererComponent(meshes[i], toonMat);
+                                multiPassRendererComponent.addMaterial(silhouetteMat);
+                                obj.addComponent(multiPassRendererComponent);                                
+                                obj.transformComponent.position = new SGE.Vector3(startX + i * span, 0.0, 0.0);
+
+                                scene.add(obj);
+                            }
+
+                            var palettesUpdater = {
+                                updatePalettes: function () {
+                                    var materialsCount = materials.length;
+                                    for (var i = 0; i < materialsCount; i++) {
+                                        var toonMat = materials[i];                                        
+                                        toonMat.colorPalette = generatePalette(toonMat.colorPalette);
+                                    }
+                                }
+                            };
+                            
+                            palettesUpdater.updatePalettes();
+                            gui.add(palettesUpdater, 'updatePalettes');
+                                                                                    
+                            var lightDirections = [
+                                new SGE.Vector3(-1.0, -1.0, 0.0),
+                                new SGE.Vector3(0.0, -1.0, -1.0),
+                                new SGE.Vector3(1.0, -1.0, 0.0),
+                                new SGE.Vector3(0.0, -1.0, 1.0),
+                            ];
+                            
+                            var duration = 24.0;
+                            var clip = new SGE.AnimationClip(true, duration);
+                            var anim = new SGE.KeyFrameAnimation(SGE.Vector3);
+
+                            var count = lightDirections.length;
+                            var step = duration / count;
+                            for (var i = 0 ; i < count; i++)
+                                anim.addKey(lightDirections[i].normalize(), i*step);
+                            anim.addKey(lightDirections[0], duration);
+                            
+                            var dir = new SGE.Vector3();
+                            var materialsCount = materials.length;
+                            var animValueDispatcher = Object.defineProperties({}, {
+                                lightDirection: {
+                                    get: function () {
+                                        return dir;
+                                    },
+                                    set: function (v) {
+                                        dir.fromVector3(v).normalize();
+                                        for (var i = 0; i < materialsCount; i++) 
+                                            materials[i].lightDirection = v;                                        
+                                    }
+                                }
+                            });
+                            
+                            clip.addCurve(function () {
+                                return animValueDispatcher;
+                            }, 'lightDirection', anim);
+                            
+                            var animator = new SGE.AnimatorComponent();
+                            animator.addClip('moveDir', clip);
+
+                            var animObj = new SGE.Object3D();
+                            animObj.addComponent(animator);
+                            scene.add(animObj);
+
+                            animator.play('moveDir');
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

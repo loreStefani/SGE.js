@@ -1,0 +1,218 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+                var colorMap;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/691.jpg');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            colorMap = SGE.createTexture(images[0]);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            cameraObject.addComponent(new DemoUtils.SphereView());
+                            scene.add(cameraObject);
+                            
+                            function createDirectionsMesh(mesh, attrib, length) {
+
+                                var vBuff = mesh.vertexBuffer;
+                                var dataMap = vBuff.dataMap;
+
+                                var positions = [];
+                                var meshPositions = dataMap.a_position;
+                                var meshNormals = dataMap[attrib];
+                                
+                                for (var i = 0, count = meshPositions.length; i < count - 2; i += 3) {
+
+                                    for (var j = 0; j < 3; j++)
+                                        positions.push(meshPositions[i + j]);
+
+                                    for (var j = 0; j < 3; j++)
+                                        positions.push(meshPositions[i + j] + meshNormals[i + j] * length);
+                                }
+
+                                var vertexLayout = new SGE.VertexLayout();
+                                vertexLayout.addAttributeDesc('a_position', 3, SGE.DataType.FLOAT);
+
+                                vBuff = SGE.createVertexBuffer(vertexLayout, { a_position: positions }, vBuff.vertexCount * 2);
+                                return new SGE.Mesh({ vertexBuffer: vBuff, primitiveTopology: SGE.PrimitiveTopology.LINES });
+                            }
+
+                            var normalVshader =
+                                [
+                                    'attribute vec3 a_position;',
+                                    'attribute vec3 a_normal;',
+                                    'uniform mat4 u_projView;',
+                                    'varying vec3 v_normal;',
+                                    'void main(){',
+                                        'gl_Position = u_projView * vec4(a_position, 1.0);',
+                                        'v_normal = a_normal;',
+                                    '}'
+                                ].join('\n');
+
+                            var normalFshader =
+                                [
+                                    'precision mediump float;',
+                                    'varying vec3 v_normal;',
+                                    'void main(){',
+                                        'gl_FragColor = vec4((v_normal + vec3(1.0, 1.0, 1.0))*0.5, 1.0);',
+                                    '}'
+                                ].join('\n');
+
+                            var normalColorMat = new SGE.CustomMaterial();
+                            normalColorMat.vertexShaderSrc = normalVshader;
+                            normalColorMat.fragmentShaderSrc = normalFshader;
+                            
+                            var normalsLen = 0.3;
+                            var tangentsLen = 0.15;
+
+                            function addRenderComponentToObject(object, mesh, material) {
+                                var renderComponent = new SGE.MeshRendererComponent(mesh, material);
+                                object.addComponent(renderComponent);
+                                return renderComponent;
+                            }
+
+                            function addOrRemoveChildIfCond(parent, child) {
+                                return function (cond) {
+                                    if (cond)
+                                        parent.addChild(child);
+                                    else
+                                        parent.removeChild(child);
+                                };
+                            }
+
+                            function ObjectWithDirections(mesh, material, normalMaterial, tangentsMaterial) {
+                                SGE.Object3D.call(this);
+                                                                
+                                var transformComponent = this.transformComponent;
+                                addRenderComponentToObject(this, mesh, material);
+                                                                
+                                var normalsObject = new SGE.Object3D();
+                                addRenderComponentToObject(normalsObject, createDirectionsMesh(mesh, 'a_normal', normalsLen), normalMaterial);
+                                var normalsObjectTransformComponent = normalsObject.transformComponent;
+
+                                var tangentsObject = new SGE.Object3D();
+                                addRenderComponentToObject(tangentsObject, createDirectionsMesh(mesh, 'a_tangent', tangentsLen), tangentsMaterial);
+                                var tangentsObjectTransformComponent = tangentsObject.transformComponent;
+
+                                var renderingNormals = false;
+                                var renderingTangents = false;
+                                                                
+                                this.renderNormals = function (render) {
+                                    if (renderingNormals == render)
+                                        return;
+                                    renderingNormals = render;
+                                    if (render) 
+                                        transformComponent.addChild(normalsObjectTransformComponent);
+                                    else
+                                        transformComponent.removeChild(normalsObjectTransformComponent);
+                                };
+
+                                this.renderTangents = function (render) {
+                                    if (renderingTangents == render)
+                                        return;
+                                    renderingTangents = render;
+                                    if (render)
+                                        transformComponent.addChild(tangentsObjectTransformComponent);
+                                    else
+                                        transformComponent.removeChild(tangentsObjectTransformComponent);
+                                };
+                            }
+                            ObjectWithDirections.prototype = SGE.Object3D.prototype;
+                                                        
+                            var cilynder = SGE.GeometryGenerator.cilynderGeometry(5.0, 2.5, 5.0, 50, 50, true, true, true);
+                            var sphere = SGE.GeometryGenerator.sphereGeometry(5.0, 50, 50, true, true, true);
+                            var grid = SGE.GeometryGenerator.gridGeometry(5.0, 5.0, 25, 25, true, true, true);
+                                                        
+                            var gridMat = normalColorMat.clone();
+                            gridMat.cullState = SGE.CullState.NONE;
+                                                        
+                            var normalMat = SGE.makeMaterial({ color: new SGE.Vector4(0.0, 0.0, 0.0, 1.0), noWorldTransform : true });
+                            var tangentMat = normalMat;
+
+                            var objects = {                                
+                                sphere: new ObjectWithDirections(sphere, normalColorMat, normalMat, tangentMat),
+                                cilynder: new ObjectWithDirections(cilynder, normalColorMat, normalMat, tangentMat),
+                                grid : new ObjectWithDirections(grid, gridMat, normalMat, tangentMat)
+                            };
+                            
+                            var values = {};
+                            var keys = [];
+
+                            for (var key in objects) 
+                                values[key] = keys.push(key) - 1;
+                            
+                            var state = {
+                                currObject: 0,
+                                prevObject: 0,
+                                renderNormals: false,
+                                renderTangents: false                                
+                            };
+
+                            scene.add(objects[keys[state.currObject]]);
+
+                            var gui = new dat.GUI();
+                            gui.add(state, 'currObject', values).onChange(function (value) {
+                                var object = objects[keys[value]];
+                                object.renderNormals(state.renderNormals);
+                                object.renderTangents(state.renderTangents);
+                                scene.add(object);
+                                scene.remove(objects[keys[state.prevObject]]);
+                                state.prevObject = value;
+                            });
+                            gui.add(state, 'renderNormals').onChange(function (value) {
+                                var currObject = objects[keys[state.currObject]];
+                                currObject.renderNormals(value);
+                            });
+                            gui.add(state, 'renderTangents').onChange(function (value) {
+                                var currObject = objects[keys[state.currObject]];
+                                currObject.renderTangents(value);
+                            });
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp(), { backGroundColor: new SGE.Vector4(1.0, 1.0, 1.0, 1.0) });
+        });
+
+    </script>
+
+</body>
+</html>

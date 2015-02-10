@@ -1,0 +1,402 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>       
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+                
+                var camera;
+                
+                var colorMap;
+                var hBlurMaterial;
+                var vBlurMaterial;
+                var mirrorHBlurMaterial;
+                var mirrorVBlurMaterial;
+                
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/mirror.jpg');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            colorMap = SGE.createTexture(images[0]);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+
+                            var visibleLayer = 0;
+                            var mirrorLayer = 1;
+                            var commonLayers = [visibleLayer, mirrorLayer];
+                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.renderOrder = 0;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            camera.renderLayer = visibleLayer;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            var sphereView = new DemoUtils.SphereView();
+                            cameraObject.addComponent(sphereView);
+                            scene.add(cameraObject);
+                                                                                    
+                            var mirrorTextureSize = new SGE.Vector2(1024, 1024);                            
+                            var mirrorTexture = SGE.createTexture(null, mirrorTextureSize.x, mirrorTextureSize.y);
+                            var mirrorRenderTarget = SGE.createRenderTarget(mirrorTexture);                            
+                            var mirrorViewPort = SGE.createViewPort(mirrorTextureSize.x, mirrorTextureSize.y);
+                            
+                            var reflectCamera = camera.clone();
+                            reflectCamera.near = 0.01;
+                            reflectCamera.aspectRatio = 1;
+                            reflectCamera.fovY = Math.PI * 0.5;                            
+                            reflectCamera.renderOrder = -1;
+                            reflectCamera.renderLayer = mirrorLayer;
+                            reflectCamera.renderTarget = mirrorRenderTarget;
+                            reflectCamera.viewPort = mirrorViewPort;
+                            var cameraObject1 = new SGE.Object3D();
+                            cameraObject1.addComponent(reflectCamera);                            
+                            scene.add(cameraObject1);
+
+                            var mirrorSize = 10.0;
+                            var halfMirrorSize = mirrorSize / 2.0;
+                            var mirrorGeom = SGE.GeometryGenerator.gridGeometry(mirrorSize, mirrorSize, 100, 100, false, true);
+
+                            var mirrorPosition = new SGE.Vector3(0.0, halfMirrorSize, -halfMirrorSize + 1.0);
+                            var mirrorNormal = SGE.VMath.zAxis;
+                            
+                            var mirror = new SGE.Object3D();
+                            mirror.transformComponent.position = mirrorPosition;
+                            mirror.transformComponent.up = mirrorNormal;
+                                                                                                                                         
+                            var mirrorVshader = [
+                                'attribute vec3 a_position;',                                
+                                'uniform mat4 u_projView;',
+                                'uniform mat4 u_world;',
+                                'uniform mat4 u_mirrorTransform;',
+                                'varying vec4 v_mirrorCoord;',
+                                'void main(){',                                    
+                                    'vec4 worldPos = u_world * vec4(a_position, 1.0);',
+                                    'v_mirrorCoord = u_mirrorTransform * worldPos;',
+                                    'gl_Position = u_projView * worldPos;',
+                                '}'
+                            ].join('\n');
+
+                            var mirrorFshader = [
+                                'precision mediump float;',
+                                'varying vec4 v_mirrorCoord;',                                
+                                'uniform sampler2D u_colorMap;',
+                                'void main(){',
+                                    'vec2 coord = v_mirrorCoord.xy / v_mirrorCoord.w;',                                    
+                                    'gl_FragColor = texture2D(u_colorMap, coord);',
+                                '}',
+                            ].join('\n');
+
+                            var mirrorMat = new SGE.CustomMaterial();
+                            mirrorMat.vertexShaderSrc = mirrorVshader;
+                            mirrorMat.fragmentShaderSrc = mirrorFshader;
+                            SGE.SimpleVariable.call(mirrorMat, 'u_colorMap', 'colorMap');
+                            SGE.SimpleVariable.call(mirrorMat, 'u_mirrorTransform', 'mirrorTransform');
+                            mirrorMat.colorMap = mirrorRenderTarget;
+                            
+                            mirror.addComponent(new SGE.MeshRendererComponent(mirrorGeom, mirrorMat, null, false, visibleLayer));
+                            scene.add(mirror);
+
+                            var transformComponent = cameraObject.transformComponent;
+                            var reflTransformComponent = cameraObject1.transformComponent;
+                            transformComponent.addEventListener('transformChanged', (function () {
+                                                                
+                                var mirrorTransform = new SGE.Matrix4();
+                                var ndcToTextSpace = new SGE.Matrix4().scale(new SGE.Vector3(0.5, 0.5, 0.5)).translate(new SGE.Vector3(1.0, 1.0, 1.0));
+                                
+                                var mirrorToCamera = new SGE.Vector3();
+
+                                var r = new SGE.Vector3();
+                                function reflectVector(incident, normal) {
+                                    r.fromVector3(normal);
+                                    r.scale(-2.0 * incident.dot(normal));
+                                    r.add(incident);
+                                    return r;                                    
+                                }
+                                                                
+                                return function () {
+
+                                    //reflect camera position
+                                    var cameraPosition = transformComponent.position;
+                                    var reflPos = reflTransformComponent.position;
+                                    mirrorToCamera.fromVector3(cameraPosition).substract(mirrorPosition);
+                                    reflPos.fromVector3(mirrorNormal).scale(-2.0 * SGE.Vector3.dot(mirrorNormal, mirrorToCamera));
+                                    reflPos.add(cameraPosition);
+                                    reflTransformComponent.position = reflPos;
+
+                                    //reflect camera axes                                    
+                                    var forward = reflTransformComponent.forward;
+                                    forward.fromVector3(reflectVector(transformComponent.forward, mirrorNormal));                                    
+                                    
+                                    var up = reflTransformComponent.up;
+                                    up.fromVector3(reflectVector(transformComponent.up, mirrorNormal));
+
+                                    var right = reflTransformComponent.right;
+                                    right.fromVector3(reflectVector(transformComponent.right, mirrorNormal));
+
+                                    reflTransformComponent.setAxes(right, up, forward);
+
+                                    mirrorTransform.fromMat4(ndcToTextSpace).multiply(reflectCamera.projectionView);
+                                    mirrorMat.mirrorTransform = mirrorTransform;
+                                };                                
+                                
+                            })());
+
+                            var pointLight = new SGE.PointLight();
+                            pointLight.castShadows = false;
+                            var lightObject = new SGE.Object3D();
+                            lightObject.addComponent(pointLight);
+                            lightObject.transformComponent.position = new SGE.Vector3(0.0, halfMirrorSize, 0.0);
+                            pointLight.attenuation = new SGE.Vector3(0.0, 0.0, 0.1);
+                            pointLight.range = mirrorSize * Math.SQRT2;
+                            pointLight.color = new SGE.Vector4(0.8, 0.8, 0.8, 1.0);
+                            scene.add(lightObject);
+                                                        
+                            function makeGridMat(color) {
+                                var mat = SGE.makeMaterial({
+                                    color: color,
+                                    receiveLight: true,
+                                    ambient: new SGE.Vector4(0.1, 0.1, 0.1, 1.0),
+                                    diffuse:  new SGE.Vector4(0.8, 0.8, 0.8, 1.0),
+                                    specular: new SGE.Vector4(1.0, 1.0, 1.0, 50.0)
+                                });
+                                mat.cullState = SGE.CullState.NONE;
+                                return mat;
+                            }
+                            
+                            var redGridMaterial = makeGridMat(new SGE.Vector4(1.0, 0.0, 0.0, 1.0));                            
+                            var grid = new SGE.Object3D();
+                            grid.transformComponent.translateY(halfMirrorSize).translateX(halfMirrorSize).rotateZ(Math.PI * 0.5);
+                            grid.addComponent(new SGE.MeshRendererComponent(mirrorGeom, redGridMaterial, null, false, commonLayers));
+                            scene.add(grid);
+
+                            var blueGridMaterial = makeGridMat(new SGE.Vector4(0.0, 0.0, 1.0, 1.0));                            
+                            var grid = new SGE.Object3D();
+                            grid.transformComponent.translateY(halfMirrorSize).translateX(-halfMirrorSize).rotateZ(-Math.PI * 0.5);
+                            grid.addComponent(new SGE.MeshRendererComponent(mirrorGeom, blueGridMaterial, null, false, commonLayers));
+                            scene.add(grid);
+
+                            var whiteGridMaterial = makeGridMat(new SGE.Vector4(1.0, 1.0, 1.0, 1.0));                            
+                            var grid = new SGE.Object3D();                            
+                            grid.addComponent(new SGE.MeshRendererComponent(mirrorGeom, whiteGridMaterial, null, false, commonLayers));
+                            scene.add(grid);
+
+                            var grid = new SGE.Object3D();
+                            grid.addComponent(new SGE.MeshRendererComponent(mirrorGeom, whiteGridMaterial, null, false, commonLayers));
+                            grid.transformComponent.translateY(mirrorSize).rotateX(Math.PI);
+                            scene.add(grid);
+
+                            var violetGridMaterial = makeGridMat(new SGE.Vector4(1.0, 0.0, 1.0, 1.0));
+                            var grid = new SGE.Object3D();
+                            grid.addComponent(new SGE.MeshRendererComponent(mirrorGeom, violetGridMaterial, null, false, visibleLayer));
+                            grid.transformComponent.translateY(halfMirrorSize).translateZ(-halfMirrorSize).rotateX(Math.PI * 0.5);
+                            scene.add(grid);
+                            
+                            var boxSize = mirrorSize / 10.0;
+                            var halfBoxSize = boxSize / 2.0;
+                            var box = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize);
+                                                        
+                            var animCurve = new SGE.KeyFrameAnimation(SGE.Quaternion);
+                            animCurve.addKey(new SGE.Quaternion(), 0.0);
+                            animCurve.addKey(SGE.Quaternion.setAxisAngle(SGE.VMath.zAxis, Math.PI), 10.0);
+                            animCurve.addKey(SGE.Quaternion.setAxisAngle(SGE.VMath.zAxis, 2 * Math.PI), 20.0);
+                            var boxesClip = new SGE.AnimationClip(true);
+                            boxesClip.addCurve(function () {
+                                return this.object3D.transformComponent;
+                            }, 'quaternion', animCurve);
+                            boxesClip.setDurationFromCurves();
+                            
+                            function addBox(position, mat) {                                                                                                                                                        
+                                var boxObj = new SGE.Object3D();
+                                boxObj.transformComponent.position = position;                                
+                                var meshRenderer = new SGE.MeshRendererComponent(box, mat, null, false, commonLayers);
+                                boxObj.addComponent(meshRenderer);
+                                var boxesAnimator = new SGE.AnimatorComponent();
+                                boxesAnimator.addClip('anim1', boxesClip);
+                                boxObj.addComponent(boxesAnimator);
+                                boxesAnimator.play('anim1');
+                                scene.add(boxObj);
+                            }
+                            
+                            var y = halfMirrorSize;
+                            sphereView.origin = new SGE.Vector3(0.0, y, 0.0);
+                            
+                            var redBoxMaterial = SGE.makeMaterial({color : new SGE.Vector4(0.4, 0.0, 0.0, 1.0)});
+                            var greenBoxMaterial = SGE.makeMaterial({color : new SGE.Vector4(0.0, 0.4, 0.0, 1.0)});
+                            var blueBoxMaterial = SGE.makeMaterial({ color: new SGE.Vector4(0.0, 0.0, 0.4, 1.0) });
+                                                      
+                            addBox(new SGE.Vector3(0.0, y, 0.0), greenBoxMaterial);
+                            addBox(new SGE.Vector3(halfBoxSize + boxSize, y, 0.0), blueBoxMaterial);
+                            addBox(new SGE.Vector3(-halfBoxSize - boxSize, y, 0.0), blueBoxMaterial);
+                            addBox(new SGE.Vector3(0.0,y+  boxSize + halfBoxSize , 0.0), redBoxMaterial);
+                            addBox(new SGE.Vector3(0.0, y - boxSize - halfBoxSize, 0.0), redBoxMaterial);
+                                                                                    
+                            var blendFshader = [
+                                'precision mediump float;',
+                                'uniform sampler2D u_frameRendered;',
+                                'varying vec2 v_textCoord;',
+                                'uniform sampler2D u_colorMap;',
+                                'uniform float u_blendFactor;',
+                                'void main(){',
+                                    'vec4 color = texture2D(u_colorMap, v_textCoord);',
+                                    'gl_FragColor = (1.0 - u_blendFactor) *color +  u_blendFactor * texture2D(u_frameRendered, v_textCoord);',
+                                '}',
+                            ].join('\n');
+
+                            var blendMat = new SGE.PostEffectMaterial();
+                            blendMat.fragmentShaderSrc = blendFshader;
+                            SGE.SimpleVariable.call(blendMat, 'u_colorMap', 'colorMap');
+                            SGE.SimpleVariable.call(blendMat, 'u_blendFactor', 'blendFactor');
+                            blendMat.colorMap = colorMap;
+                            blendMat.blendFactor = 0.855;
+
+                            reflectCamera.addPostEffectMaterial(blendMat);
+                                                        
+                            var gaussianNormalWeights = [
+                                '0.0545',
+                                '0.2442',
+                                '0.4026',
+                                '0.2442',
+                                '0.0545'
+                            ];
+
+                            var vBlurFragment = [
+                                'precision mediump float;',
+                                'uniform sampler2D u_frameRendered;',
+                                'varying vec2 v_textCoord;',
+                                'uniform float u_radius;',
+                                'uniform float u_invFrameHeight;',
+                                'void main(){',
+                                'float dy = u_radius * u_invFrameHeight;',
+                                'float doubleDy = 2.0* dy;',
+                                'vec4 smpl ='+ gaussianNormalWeights[0] + '* texture2D(u_frameRendered, v_textCoord + vec2(0.0,-doubleDy));',
+                                'smpl += ' + gaussianNormalWeights[1] + ' * texture2D(u_frameRendered, v_textCoord + vec2(0.0, -dy));',
+                                'smpl +=' + gaussianNormalWeights[2] + ' * texture2D(u_frameRendered, v_textCoord );',
+                                'smpl += ' + gaussianNormalWeights[3] + ' * texture2D(u_frameRendered, v_textCoord + vec2(0.0,dy));',
+                                'smpl += ' + gaussianNormalWeights[4] + '* texture2D(u_frameRendered, v_textCoord + vec2(0.0, doubleDy));',
+                                'gl_FragColor = smpl;',
+                                '}'
+                            ].join('\n');
+                                                        
+                            var hBlurFragment = [
+                                'precision mediump float;',
+                                'uniform sampler2D u_frameRendered;',
+                                'varying vec2 v_textCoord;',
+                                'uniform float u_radius;',
+                                'uniform float u_invFrameWidth;',
+                                'void main(){',
+                                'float dx = u_radius * u_invFrameWidth;',
+                                'float doubleDx = 2.0* dx;',
+                                'vec4 smpl = ' + gaussianNormalWeights[0] + '* texture2D(u_frameRendered, v_textCoord + vec2(-doubleDx,0.0));',
+                                'smpl += ' + gaussianNormalWeights[1] + '* texture2D(u_frameRendered, v_textCoord + vec2(-dx,0.0));',
+                                'smpl += ' + gaussianNormalWeights[2] + '* texture2D(u_frameRendered, v_textCoord );',
+                                'smpl += ' + gaussianNormalWeights[3] + ' * texture2D(u_frameRendered, v_textCoord + vec2(dx,0.0));',
+                                'smpl += ' + gaussianNormalWeights[4] + '* texture2D(u_frameRendered, v_textCoord + vec2(doubleDx,0.0));',
+                                'gl_FragColor = smpl;',
+                                '}'
+                            ].join('\n');
+
+                            function makeBlurMat(horizontal, initRadius) {
+                                var blurMaterial = new SGE.PostEffectMaterial();                                                                
+                                if (horizontal){
+                                    blurMaterial.fragmentShaderSrc = hBlurFragment;
+                                    SGE.SimpleVariable.call(blurMaterial, 'u_invFrameWidth', 'invFrameWidth');
+                                }
+                                else{
+                                    blurMaterial.fragmentShaderSrc = vBlurFragment;
+                                    SGE.SimpleVariable.call(blurMaterial, 'u_invFrameHeight', 'invFrameHeight');
+                                }
+                                SGE.SimpleVariable.call(blurMaterial, 'u_radius', 'radius');
+                                blurMaterial.radius = initRadius;
+
+                                return blurMaterial;
+                            }
+
+                            hBlurMaterial = makeBlurMat(true, 2.501);
+                            vBlurMaterial = makeBlurMat(false, 2.501);
+
+                            camera.addPostEffectMaterial(hBlurMaterial);
+                            camera.addPostEffectMaterial(vBlurMaterial);
+
+                            var mirrorHBlurMaterial = makeBlurMat(true, 1.001);
+                            var mirrorVBlurMaterial = makeBlurMat(false, 1.001);
+
+                            mirrorHBlurMaterial.invFrameWidth = 1.0 / mirrorTextureSize.x;
+                            mirrorVBlurMaterial.invFrameHeight = 1.0 / mirrorTextureSize.y;
+
+                            reflectCamera.addPostEffectMaterial(mirrorHBlurMaterial);
+                            reflectCamera.addPostEffectMaterial(mirrorVBlurMaterial);
+                            
+                            var maxBlurRadius = 20.0;
+
+                            var gui = new dat.GUI();
+                            var blurFolder = gui.addFolder('Blur');                            
+                            blurFolder.add(hBlurMaterial, 'radius', 0.0, maxBlurRadius).name('Horizontal radius');
+                            blurFolder.add(vBlurMaterial, 'radius', 0.0, maxBlurRadius).name('Vertical radius');
+
+                            var mirrorFolder = gui.addFolder('Mirror');
+                            mirrorFolder.add(blendMat, 'blendFactor', 0.0, 1.0);
+                            var mirrorBlurFolder = mirrorFolder.addFolder('Blur');
+                            mirrorBlurFolder.add(mirrorHBlurMaterial, 'radius', 0.0, maxBlurRadius).name('Horizontal radius');
+                            mirrorBlurFolder.add(mirrorVBlurMaterial, 'radius', 0.0, maxBlurRadius).name('Vertical radius');
+                                                        
+                            var quality = Object.defineProperties({}, {
+                                renderTargetSize: {
+                                    get: function () {
+                                        return mirrorTextureSize;
+                                    },
+                                    set: function (v) {
+                                        var width = Math.floor(v.x);
+                                        var height = Math.floor(v.y);
+                                        mirrorTextureSize.set(width, height);
+                                        mirrorViewPort.release();                                        
+                                        mirrorViewPort = SGE.createViewPort(width, height);
+                                        reflectCamera.viewPort = mirrorViewPort;
+                                        mirrorTexture.width = width;
+                                        mirrorTexture.height = height;
+                                        mirrorHBlurMaterial.invFrameWidth = 1.0 / width;
+                                        mirrorVBlurMaterial.invFrameHeight = 1.0 / height;
+                                    }
+                                }
+                            });
+                            
+                            new DemoUtils.Vector2Controller(mirrorFolder, quality, 'renderTargetSize', ['width', 'height'], [256, 256], [4096, 4096]);
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {                                                        
+                            camera.aspectRatio = width / height;
+                            hBlurMaterial.invFrameWidth = 1.0/ width;
+                            vBlurMaterial.invFrameHeight = 1.0/height;
+                        }
+                    }
+                });
+            });
+
+            new SGE.Engine({ stats: true }).run(new MyApp(), { backGroundColor: new SGE.Vector4(0.0, 0.0, 0.0, 1.0) });
+        });
+
+    </script>
+
+</body>
+</html>

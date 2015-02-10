@@ -1,0 +1,354 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>   
+    <script type="text/javascript">
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+        
+            var MyApp = DemoUtils.DemoInit(function () {
+                
+                var imageFolder = 'Textures/';
+                                
+                var images = [
+                    'dlc_heller_zombie_head_colour.jpg',
+                    'dlc_heller_zombie_legs_colour.jpg',
+                    'dlc_heller_zombie_torso_colour.jpg'
+                ];
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'envmap_interstellar/';
+
+                var cubeFaces = [
+                     'posx.jpg',
+                     'negx.jpg',
+                     'posy.jpg',
+                     'negy.jpg',
+                     'posz.jpg',
+                     'negz.jpg'
+                ];
+
+                var modelsFolder = 'Models/';
+                var models = [
+                    'model.json',
+                    'zombie_idle.json',
+                    'zombie_walking.json',
+                    'zombie_left_strafe.json',
+                    'zombie_right_strafe.json',
+                    'zombie_walking_zombie.json',
+                    'zombie_jump.json',
+                    'zombie_samba.json',
+                    'zombie_skinning_test.json'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+                images.forEach(DemoUtils.addFileFolder(imageFolder));                
+                models.forEach(DemoUtils.addFileFolder(modelsFolder));
+
+                var headColor;
+                var legsColor;
+                var powerCapColor;
+                var torsoColor;
+
+                var skyBox;
+
+                var model_json;
+                var animations = [];
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                            for (var i = 0 ; i < models.length; i++)
+                                loadRequests.textFiles.push(models[i]);
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images, animFiles) {
+
+                            headColor = SGE.createTexture(images[0]);
+                            legsColor = SGE.createTexture(images[1]);
+                            torsoColor = SGE.createTexture(images[2]);
+
+                            var skyBoxImagesIndex = 3;
+                            for (var i = 0 ; i < 6; i++)
+                                cubeFaces[i] = images[skyBoxImagesIndex + i];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+
+                            model_json = JSON.parse(animFiles[0]);
+                            var count = animFiles.length;
+                            for (var i = 1 ; i < count; i++)
+                                animations.push(JSON.parse(animFiles[i]).animations);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.skyBox = skyBox;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();                            
+                            cameraObject.addComponent(camera);
+                            var sphereView = new DemoUtils.SphereView(new SGE.Vector3(0.0, 20.0, 0.0), 15.0);
+                            cameraObject.addComponent(sphereView);
+                            sphereView.radius = 50.0;
+                            sphereView.theta = Math.PI * 0.5;                            
+                            scene.add(cameraObject);
+
+                            var skeleton = new SGE.Skeleton(new SGE.SkeletonData(model_json.bones));
+                            var skins = SGE.GeometryGenerator.fromJSON(model_json.meshes, true, true, true, true);
+
+                            var torsoBounds = skins[1].bounds;
+                            sphereView.origin = torsoBounds.center;
+                            
+                            var animationsNames =
+                                [
+                                    'idle',
+                                    'walk',
+                                    'left strafe',
+                                    'right strafe',
+                                    'zombie',                                    
+                                    'jump',
+                                    'dance',
+                                    'skinning test'
+                                ];
+
+                            var skeletonAnimator = new SGE.AnimatorComponent();
+                            var count = animationsNames.length;
+                            for (var i = 0; i < count; i++) {
+                                var skeletonAnimations = SGE.SkeletonAnimationsLoader(animations[i]);
+                                skeletonAnimator.addClip(animationsNames[i], skeletonAnimations[0]);
+                            }
+
+                            var animObj = new SGE.Object3D();
+                            animObj.addComponent(new SGE.SkeletonComponent(skeleton));
+                            animObj.addComponent(skeletonAnimator);
+                            skeletonAnimator.play('zombie', 1.0);
+                            scene.add(animObj);
+
+                            var animState = {
+                                crossFadeLength : 5.0
+                            };
+
+                            var gui = new dat.GUI();
+                            gui.add(animState, 'crossFadeLength', 0.05, 10.0);
+                            
+                            for (var i = 0; i < count; i++) {
+                                var name = animationsNames[i];
+                                var propName = 'crossFade ' + name;
+                                animState[propName] = (function (name) {
+                                    return function () {                                        
+                                        skeletonAnimator.crossFade(name, animState.crossFadeLength, updateControllers);
+                                        updateControllers();
+                                    };                                    
+                                })(name);
+                                gui.add(animState, propName);
+                            }
+                            
+                            var blendingFolder = gui.addFolder('blending');
+                            
+                            function updateControllers() {
+                                for (var i = 0; i < count; i++) {
+                                    var name = animationsNames[i];
+                                    animState[name] = skeletonAnimator.getNormalizedWeight(name);
+                                    controllers[i].updateDisplay();
+                                }
+                            }
+                            
+                            var controllers = [];
+                            for (var i = 0; i < count; i++) {
+                                var animName = animationsNames[i];
+                                animState[animName] = 1.0/count;
+                                var controller = blendingFolder.add(animState, animName, 0.0, 1.0);
+                                animState[animName] = 0.0;
+                                controller.updateDisplay();                                
+                                controller.onChange((function (name) {
+                                    return function (value) {
+                                        skeletonAnimator.stopAll();
+                                        for (var i = 0; i < count; i++) {
+                                            var name = animationsNames[i];
+                                            skeletonAnimator.play(name, animState[name]);
+                                        }
+                                        updateControllers();                                        
+                                    };
+                                })(animName));
+                                controllers.push(controller);
+                            }
+
+                            var skinObject = new SGE.Object3D();
+                            var skinObjTransformComponent = skinObject.transformComponent;
+
+                            var maps = [headColor, torsoColor, legsColor, torsoColor];
+
+                            var skinRenderers = [];
+                            var materials = [];
+                            var litMaterials = [];
+
+
+                            var skinsCount = skins.length;
+                            for (var i = 0 ; i < skinsCount; i++) {
+                                var subSkinObj = new SGE.Object3D();
+                                var matParams = {
+                                    colorMap: maps[i],
+                                    uniformScale: true,
+                                    noWorldTransform: true
+                                };
+                                var skinMat = SGE.makeMaterial(matParams);                                
+                                var skinRenderer = new SGE.MeshRendererComponent(skins[i], skinMat);
+                                subSkinObj.addComponent(new SGE.SkeletonComponent(skeleton));
+                                subSkinObj.addComponent(skinRenderer);
+                                skinObjTransformComponent.addChild(subSkinObj.transformComponent);
+
+                                skinRenderers.push(skinRenderer);
+                                materials.push(skinMat);
+                                matParams.receiveLight = true;
+                                matParams.ambient = new SGE.Vector4(0.2, 0.2, 0.2, 1.0);
+                                matParams.diffuse = new SGE.Vector4(1.0, 1.0, 1.0, 1.0);
+                                matParams.specular = new SGE.Vector4(0.0, 0.0, 0.0, 3.0);
+                                skinMat = SGE.makeMaterial(matParams);
+                                litMaterials.push(skinMat);
+                            }
+
+                            scene.add(skinObject);
+                                                        
+                            var gridGeom = SGE.GeometryGenerator.gridGeometry(50.0, 50.0, 5, 5, false, true);
+                            var gridMatParams = {
+                                color: new SGE.Vector4(1.0, 1.0, 1.0, 1.0),                                
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse : new SGE.Vector4(1.0, 1.0, 1.0, 1.0),
+                                specular: new SGE.Vector4(1.0, 1.0, 1.0, 5.0),
+                                uniformScale : true,
+                                noWorldTransform : true
+                            };
+                            
+                            var litGridMat = SGE.makeMaterial(gridMatParams);                            
+                            var grid = new SGE.Object3D();
+                            var gridRenderer = new SGE.MeshRendererComponent(gridGeom, litGridMat);
+                            grid.addComponent(gridRenderer);
+                            scene.add(grid);
+                            
+                            var gridMatRebuilder = new DemoUtils.SingleMaterialRebuilder(litGridMat, gridMatParams);
+                            gridMatRebuilder.renderComponents.push(gridRenderer);
+
+                            var dirLight = new SGE.DirectionalLight(null, -0.01);
+                            var lightObject = new SGE.Object3D();
+                            dirLight.castShadows = false;
+                            lightObject.addComponent(dirLight);
+                            dirLight.color = new SGE.Vector4(0.8, 0.8, 0.8, 1.0);
+                            dirLight.direction = new SGE.Vector3(-1.0, -1.0, 0.0);
+                            var scaleOnDir = -40.0;
+                            lightObject.transformComponent.translateOnAxis(dirLight.direction, scaleOnDir);
+                            dirLight.setVolume(scaleOnDir, -2 * scaleOnDir);
+                            scene.add(lightObject);
+                            
+                            var quality = {
+                                light: false,
+                                shadows: false,
+                                softShadows : false
+                            };
+
+                            var qualityFolder = gui.addFolder('quality');
+                            var lightController = qualityFolder.add(quality, 'light');
+                            var shadowController = qualityFolder.add(quality, 'shadows');
+                            var softShadowController = qualityFolder.add(quality, 'softShadows');
+                            
+                            var materialFolder = qualityFolder.addFolder('material');
+                            var materialController = new DemoUtils.LitMaterialController(materialFolder, litMaterials[0]);
+
+                            for (var i = 1; i < skinsCount; i++)
+                                materialController.addMirrorMaterial(litMaterials[i]);
+
+                            var lightFolder = qualityFolder.addFolder('light');
+                            var dirLightController = new DemoUtils.DirectionalLightController(lightFolder, dirLight);
+                            var dirLightShadowController = new DemoUtils.ShadowController(lightFolder, dirLight, dirLightController, scaleOnDir);
+                            var sceneFolder = qualityFolder.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+                            
+                            lightController.onChange(function (set) {
+                                                                
+                                var materialArray;
+                                var sceneOp;
+                                var rebuilderOp;
+
+                                if (set) {
+                                    materialArray = litMaterials;
+                                    sceneOp = 'add';
+                                    gridMatRebuilder.addParam('receiveLight', true);
+                                }
+                                else {
+                                    materialArray = materials;
+                                    sceneOp = 'remove';
+                                    gridMatRebuilder.removeParam('receiveLight');
+                                    shadowController.setValue(false);
+                                }
+
+                                for (var i = 0; i < skinsCount; i++) {
+                                    var skinRenderer = skinRenderers[i];
+                                    skinRenderer.removeMaterialByIndex(0);
+                                    skinRenderer.addMaterial(materialArray[i]);
+                                }
+                                gridMatRebuilder.rebuild();
+                                scene[sceneOp](lightObject);                                                               
+
+                            });
+
+                            var castShadowsController = dirLightShadowController.castShadowsController;
+
+                            shadowController.onChange((function () {
+                                var rebuilderListener = gridMatRebuilder.makeBooleanListener('receiveShadows', true);
+                                return function (set) {
+                                    rebuilderListener(set);
+                                    if (set) {
+                                        lightController.setValue(true);
+                                        castShadowsController.setValue(true);
+                                    } else 
+                                        castShadowsController.setValue(false);
+                                };
+                            })());
+                            
+                            castShadowsController.onChange(function (set) {
+                                var shadowControllerValue = shadowController.getValue();
+                                if (set != shadowControllerValue)
+                                    shadowController.setValue(set);                                
+                            });                            
+
+                            softShadowController.onChange((function () {
+                                var rebuilderListener = gridMatRebuilder.makeBooleanListener('pcf', true);
+                                return function (set) {
+                                    rebuilderListener(set);
+                                    if (set)
+                                        shadowController.setValue(true);
+                                };
+                            })());
+
+
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+            
+            new SGE.Engine({ stats : true }).run(new MyApp());
+        });
+        
+    </script>
+
+</body>
+</html>

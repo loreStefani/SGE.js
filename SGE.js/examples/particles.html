@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+            
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+                var colorMap;
+                
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/flare0.png');                            
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages) {
+                            colorMap = SGE.createTexture(loadedImages[0]);                            
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            var cameraObject = new SGE.Object3D();
+                            camera.cullType = SGE.CullType.DISABLED;
+                            camera.renderSortType = SGE.RenderSortType.OPAQUE_FIRST;
+                            cameraObject.addComponent(camera);
+                            cameraObject.transformComponent.position = new SGE.Vector3(0.0, 0.0, 5.0);
+                            cameraObject.addComponent(new DemoUtils.SphereView());
+                            scene.add(cameraObject);
+                            
+                            var vshader = [
+                                                                
+                                'attribute vec3 a_initVelocity;',                                
+                                'attribute float a_size;',
+                                
+                                'attribute float a_age;',
+                                
+                                'uniform vec3 u_acceleration;',
+                                
+                                'uniform mat4 u_world;',
+                                'uniform mat4 u_projView;',                                
+                                
+                                'void main(){',
+                                    'vec3 pos = a_initVelocity*a_age + u_acceleration*0.5*a_age*a_age;',                                    
+                                    'gl_Position = u_projView * u_world * vec4(pos,1.0);',
+                                    'gl_PointSize = a_size;',
+                                '}'
+                            ].join('\n');
+
+                            var fshader = [
+
+                                'precision mediump float;',
+                                                                
+                                'uniform sampler2D u_colorMap;',
+                                
+                                'void main(){',
+                                    'vec4 col = texture2D(u_colorMap, gl_PointCoord);',
+                                    'if(col.w < 0.5) discard;',
+                                    'gl_FragColor = col;',
+                                '}'
+                            ].join('\n');
+                            
+                            
+                            function ParticleGenerator() {
+                                
+                                this.maxSize = 40.0;
+                                this.initSpeed = 1.5;
+                                
+                                var one = new SGE.Vector3(1.0, 1.0, 1.0);
+                                var two = new SGE.Vector3(2.0, 2.0, 2.0);
+
+                                this.generate = function (particles, startIndex, count) {                                    
+                                    var velocities = particles.velocities;                                    
+                                    var ages = particles.ages;
+                                    var sizes = particles.sizes;
+                                    var maxSizeMinusOne = Math.max(this.maxSize -1, 1);
+
+                                    var speed = this.initSpeed;
+                                    for (var i = 0; i < count; i++) {
+                                        var index = startIndex + i;                                                                                
+                                        var velocity = velocities.get(index);                              
+                                        velocity.set(Math.random(), Math.random(),Math.random());
+                                        //transform from [0,1] to [-1,1]
+                                        velocity.multiply(two).substract(one);
+                                        velocity.normalize().scale(Math.random()*speed+0.01);
+                                        ages[index] = 0.0;
+                                        sizes[index] = (Math.random() * maxSizeMinusOne) + 1;
+                                    }
+                                };
+                            }
+
+                            function ParticleUpdater() {
+
+                                this.maxAge = 1.5;
+                                
+                                this.update = function (particles, dt) {
+                                    var count = particles.aliveCount;
+                                    var ages = particles.ages;
+                                    var maxAge = this.maxAge;
+                                    for (var i = 0; i < count; i++) {
+                                        var age = ages[i] + dt;
+                                        if (age > maxAge) {
+                                            particles.kill(i);
+                                            i--;
+                                            count--;
+                                            continue;
+                                        }
+                                        ages[i] = age;
+                                    }
+                                }
+                            }
+                            
+                            function PointEmitterParticles() {
+                                DemoUtils.ParticleSystem.apply(this, arguments);
+
+                                var vertexLayout = this.perChangeVertexLayout;
+                                vertexLayout.addAttributeDesc('a_initVelocity', 3, SGE.DataType.FLOAT);                                
+                                vertexLayout.addAttributeDesc('a_size', 1, SGE.DataType.FLOAT);
+
+                                vertexLayout = this.perFrameVertexLayout;
+                                vertexLayout.addAttributeDesc('a_age', 1, SGE.DataType.FLOAT);
+
+                                var particleMat = new SGE.CustomMaterial();
+                                particleMat.vertexShaderSrc = vshader;
+                                particleMat.fragmentShaderSrc = fshader;
+                                particleMat.blendState = SGE.BlendState.ADD_ALPHA_BLEND;
+                                SGE.SimpleVariable.call(particleMat, 'u_acceleration', 'acceleration');
+                                SGE.SimpleVariable.call(particleMat, 'u_colorMap', 'colorMap');                                
+                                particleMat.acceleration = new SGE.Vector3(0.0, 4.0, 0.0);
+                                particleMat.colorMap = colorMap;
+
+                                this.particleMaterial = particleMat;
+                                                                
+                                this.ages = null;
+                                this.velocities = null;
+                                this.sizes = null;
+
+                                this.init = function () {
+                                    var particleCount = this.particleCount;
+
+                                    this.ages = new Float32Array(particleCount);
+                                    this.velocities = new SGE.Vector3Array(particleCount);                                    
+                                    this.sizes = new Float32Array(particleCount);
+
+                                    var dataMap = this.perChangeDataMap;
+                                    dataMap.a_initVelocity = this.velocities.data;
+                                    dataMap.a_size = this.sizes;
+
+                                    this.perFrameDataMap.a_age = this.ages;
+                                };
+
+                                this.swap = function (i, j) {
+                                    this.velocities.get(i).fromVector3(this.velocities.get(j));
+                                    this.ages[i] = this.ages[j];
+                                    this.sizes[i] = this.sizes[j];
+                                };
+
+                                this.init();
+                            }
+                            PointEmitterParticles.prototype = DemoUtils.ParticleSystem.prototype;
+                
+                            var obj = new SGE.Object3D();
+                            var behavior = new PointEmitterParticles(2000);
+                            behavior.emitRatio = 1299.999;
+                            behavior.particleGenerators.push(new ParticleGenerator());
+                            behavior.particleUpdaters.push(new ParticleUpdater(behavior.particleMaterial));
+
+                            obj.addComponent(behavior);
+                            scene.add(obj);
+                                                        
+                            var gui = new dat.GUI();
+                            gui.add(behavior, 'particleCount');
+                            gui.add(behavior, 'emitRatio');
+                            gui.add(behavior.particleGenerators[0], 'maxSize');
+                            gui.add(behavior.particleGenerators[0], 'initSpeed');
+                            new DemoUtils.Vector3Controller(gui, behavior.particleMaterial, 'acceleration');
+                            gui.add(behavior.particleUpdaters[0], 'maxAge');
+                            
+                            
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+            new SGE.Engine({ stats: true }).run(new MyApp(), { backGroundColor: new SGE.Vector4(0.0, 0.0, 0.0, 1.0) });
+        });
+
+    </script>
+
+</body>
+</html>

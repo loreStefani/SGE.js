@@ -1,0 +1,262 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+            
+            var MyApp = DemoUtils.DemoInit(function() {            
+                                
+                var imageFolder = 'Textures/';
+                                
+                var images = [
+                    'crate.gif',
+                    'WoodFine0039_1_S.jpg'                    
+                ];
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'envmap_interstellar/';
+
+                var cubeFaces = [
+                    'posx.jpg',
+                    'negx.jpg',
+                    'posy.jpg',
+                    'negy.jpg',                    
+                    'posz.jpg',
+                    'negz.jpg'
+                ];
+
+                cubeFaces.forEach(addFileFolder(cubeFolder));
+                images.forEach(addFileFolder(imageFolder));
+
+                var skyBox;
+                var camera;
+
+                var groundColorMap;                
+                var boxColorMap;                
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);                            
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages) {
+                            boxColorMap = SGE.createTexture(loadedImages[0]);
+                            groundColorMap = SGE.createTexture(loadedImages[1]);
+                                                        
+                            var skyBoxImagesIndex = images.length;
+                            for (var i = 0 ; i < 6; i++)
+                                cubeFaces[i] = loadedImages[skyBoxImagesIndex + i];
+                            skyBox = SGE.createTextureCube(cubeFaces);                           
+
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.skyBox = skyBox;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                                              
+                            scene.add(cameraObject);
+                                                        
+                            var groundW = 50.0;
+                            var groundH = 5.0;
+                            var groundD = 50;
+                            var ground = SGE.GeometryGenerator.boxGeometry(groundW, groundH, groundD, true);
+                            var boxSize = 2.0;
+                            var box = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize, true);
+
+                            cameraObject.addComponent(new DemoUtils.SphereView(null, null, null, groundW + 10.0));
+
+                            var groundMat = SGE.makeMaterial({ colorMap: groundColorMap });                            
+                            var boxMat = SGE.makeMaterial({ colorMap: boxColorMap });
+
+                            var parent = new SGE.Object3D();                            
+                            parent.addComponent(new SGE.MeshRendererComponent(ground, groundMat));
+                            var parentAnimator = new SGE.AnimatorComponent();
+                            parent.addComponent(parentAnimator);
+
+                            var childrenCount = 20;
+                            var childrenAnimators = [];
+                            groundW -= boxSize;
+                            groundD -= boxSize;
+                            groundH += boxSize;
+                            var halfGroundW = groundW * 0.5;
+                            var halfGroundD = groundD * 0.5;
+                            var halfGroundH = groundH * 0.5;
+
+                            function getPositionOnGround(position) {
+                                position.set(Math.random() * groundW - halfGroundW, halfGroundH, Math.random() * groundD - halfGroundD);
+                            }
+                            
+                            for (var i = 0 ; i < childrenCount; i++) {
+                                var childHandle = new SGE.Object3D(parent);
+                                var transformComponent = childHandle.transformComponent;
+                                var position = transformComponent.position;
+                                getPositionOnGround(position);
+                                transformComponent.position = position;
+                                var child = new SGE.Object3D(childHandle);
+                                child.addComponent(new SGE.MeshRendererComponent(box, boxMat));
+                                var childrenAnimator = new SGE.AnimatorComponent();
+                                child.addComponent(childrenAnimator);
+                                childrenAnimators.push(childrenAnimator);                                
+                            }
+                            
+                            scene.add(parent);
+
+                            var duration = 5.0;
+                            var halfDuration = duration / 2.0;
+                            var _2PI = Math.PI * 2.0;
+
+                            function makeRotationAnim(curve, axis) {
+                                curve.removeKeys();
+                                curve.addKey(new SGE.Quaternion(), 0.0);
+                                curve.addKey(new SGE.Quaternion().setAxisAngle(axis, Math.PI), halfDuration);
+                                curve.addKey(new SGE.Quaternion().setAxisAngle(axis, _2PI), duration);
+                            }
+
+                            var maxTranslate = 5.0; 
+
+                            function makeTranslateAnim(curve, axis) {
+                                curve.removeKeys();
+                                curve.addKey(new SGE.Vector3(), 0.0);
+                                curve.addKey(new SGE.Vector3().scaleAndAdd(axis, maxTranslate), halfDuration);
+                                curve.addKey(new SGE.Vector3(), duration);
+                            }
+
+                            var maxScale = 5.0;
+                            function makeScaleAnim(curve, axis) {
+                                curve.removeKeys();
+                                curve.addKey(new SGE.Vector3(1.0, 1.0, 1.0), 0.0);
+                                var scale = new SGE.Vector3().fromVector3(axis).scale(maxScale);
+                                if (scale.x == 0.0)
+                                    scale.x = 1.0;
+                                if (scale.y == 0.0)
+                                    scale.y = 1.0;
+                                if (scale.z == 0.0)
+                                    scale.z = 1.0;
+                                curve.addKey(scale, halfDuration);
+                                curve.addKey(new SGE.Vector3(1.0, 1.0, 1.0), duration);
+                            }
+
+                            function getTransformComponent() {
+                                return this.object3D.transformComponent;
+                            }
+                            
+                            
+                            function AnimationController(gui, name, axis, curve, animators, updateFun) {
+                                axis = new SGE.Vector3().fromVector3(axis);
+                                var needsUpdate = true;
+                                var animatorsCount = animators.length;                                
+                                Object.defineProperties(this, {
+
+                                    axis: {
+                                        get: function () {
+                                            return axis;
+                                        },
+                                        set: function (v) {
+                                            if (v != axis)
+                                                axis.fromVector3(v);
+                                            axis.normalize();
+                                            needsUpdate = true;
+                                        }
+                                    },
+                                    play: {
+                                        value: function () {
+                                            if (needsUpdate) {
+                                                updateFun(curve, axis);
+                                                needsUpdate = false;
+                                            }
+                                            for (var i = 0; i < animatorsCount; i++)
+                                                animators[i].play(name);
+                                        }
+                                    }
+                                });
+
+                                var folder = gui.addFolder(name);
+                                var axisController = new DemoUtils.Vector3Controller(folder, this, 'axis', ['x', 'y', 'z'], [-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]);
+                                var playController = folder.add(this, 'play');
+                            }
+
+
+                            function addAnimationsControllers(gui, animators, translAxis, rotAxis, scaleAxis) {
+
+                                var translateClip = new SGE.AnimationClip(false, duration);
+                                var translateCurve = new SGE.KeyFrameAnimation(SGE.Vector3);
+                                translateClip.addCurve(getTransformComponent, 'position', translateCurve);
+
+                                var rotateClip = new SGE.AnimationClip(false, duration);
+                                var rotateCurve = new SGE.KeyFrameAnimation(SGE.Quaternion);
+                                rotateClip.addCurve(getTransformComponent, 'quaternion', rotateCurve);
+
+                                var scaleClip = new SGE.AnimationClip(false, duration);
+                                var scaleCurve = new SGE.KeyFrameAnimation(SGE.Vector3);
+                                scaleClip.addCurve(getTransformComponent, 'scale', scaleCurve);
+
+                                var animatorsCount = animators.length;
+                                for (var i = 0 ; i < animatorsCount; i++) {
+                                    animators[i].addClip('translate', translateClip);
+                                    animators[i].addClip('rotate', rotateClip);
+                                    animators[i].addClip('scale', scaleClip);
+                                }
+
+                                var translateController = new AnimationController(gui, 'translate', translAxis, translateCurve, animators, makeTranslateAnim);
+                                var rotateController = new AnimationController(gui, 'rotate', rotAxis, rotateCurve, animators, makeRotationAnim);
+                                var scaleController = new AnimationController(gui, 'scale', scaleAxis, scaleCurve, animators, makeScaleAnim);                                                                
+                                                               
+                            }
+
+                            var gui = new dat.GUI();
+                            var groundFolder = gui.addFolder('ground');
+                            var x = new SGE.Vector3(1.001, 0.001, 0.001);
+                            var y = new SGE.Vector3(0.001, 1.001, 0.001);                            
+                            var z = new SGE.Vector3(0.001, 0.001, 1.001);
+                            addAnimationsControllers(groundFolder, [parentAnimator], y, y, x);
+                            var boxesFolder = gui.addFolder('boxes');
+                            addAnimationsControllers(boxesFolder, childrenAnimators, y, z, x);
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+
+            function addFileFolder(folder) {
+
+                return function (v, i, a) {
+                    if (!(v instanceof Array))
+                        a[i] = folder + v;
+                };
+            }
+
+            new SGE.Engine({ stats: true}).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

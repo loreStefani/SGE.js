@@ -1,0 +1,425 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function() {
+                                
+                var imageFolder = 'Textures/';
+
+                var images = [                    
+                    'DSC_3518.jpg',                    
+                    'DSC_3518_bump.jpg',
+                    'crate.gif',
+                    'crate_NRM.jpg'                    
+                ];
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'sunny/';
+                var cubeExt = '.png';
+
+                var cubeFaces = [
+                    'posx',
+                    'negx',
+                    'posy',
+                    'negy',
+                    'posz',
+                    'negz'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+                cubeFaces.forEach(function (v, i) { cubeFaces[i] = v += cubeExt;});
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+                
+                var camera;                                
+                var skyBox;
+                var groundColorMap;
+                var groundBumpMap;                
+                var boxColorMap;
+                var boxBumpMap;                
+                var teapotOBJ;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                            loadRequests.textFiles.push('Models/wt_teapot.obj');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages, textFiles) {                            
+                            groundColorMap = SGE.createTexture(loadedImages[0]);
+                            groundBumpMap = SGE.createTexture(loadedImages[1]);                            
+                            boxColorMap = SGE.createTexture(loadedImages[2]);
+                            boxBumpMap = SGE.createTexture(loadedImages[3]);
+                            var cubeMapImagesIndex = images.length;
+                            for (var i = 0; i < 6; i++)
+                                cubeFaces[i] = loadedImages[i + cubeMapImagesIndex];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+                            teapotOBJ = textFiles[0];
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                            
+                            var mainLayer = 0;
+                            var reflectiveLayer = 1;
+                            var commonLayers = [mainLayer, reflectiveLayer];
+                            var reflectiveObjectsLayers = [mainLayer];
+
+                            //main camera
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.skyBox = skyBox;
+                            camera.renderLayer = mainLayer;
+                            camera.renderSortType = SGE.RenderSortType.DONT_CARE;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                                                        
+                            var sphereView = new DemoUtils.SphereView();
+                            cameraObject.addComponent(sphereView);
+                            scene.add(cameraObject);
+                            
+                            //Light
+                            var dirLight = new SGE.DirectionalLight(new SGE.Vector4(1024, 1024), -0.05);
+                            dirLight.lightCamera.cullType = SGE.CullType.DISABLED;
+                            var lightObject = new SGE.Object3D();
+                            dirLight.castShadows = true;
+                            lightObject.addComponent(dirLight);
+                            var lightObjectTransformComponent = lightObject.transformComponent;
+                            dirLight.color = new SGE.Vector4(0.8, 0.8, 0.8, 1.0);
+                            var lightDirection = new SGE.Vector3(1.0, -1.0, 1.0);
+                            dirLight.direction = lightDirection;
+                            var scaleOnDir = -10.0;
+                            lightObjectTransformComponent.translateOnAxis(dirLight.direction, scaleOnDir);
+                            scene.add(lightObject);
+                            dirLight.setVolume(20.0, -2 * scaleOnDir);
+
+                            //dynamic envmap cameras                            
+                            var pointLight = new SGE.PointLight(new SGE.Vector2(256,256));
+                            var dynamicEnvMap = pointLight.shadowMapTexture;
+                            var lightCameras = pointLight.lightCamera;
+
+                            for (var i = 0 ; i < 6; i++) {
+                                var lightCamera = lightCameras[i];
+                                lightCamera.skyBox = skyBox;
+                                lightCamera.renderLayer = reflectiveLayer;
+                                lightCamera.renderSortType = SGE.RenderSortType.DONT_CARE;
+                                lightCamera.cullType = SGE.CullType.DISABLED;
+                            }
+                            
+                            var camerasHandle = lightCameras[0].object3D.transformComponent.parent.object3D;                            
+                                                        
+                            var reflectHandle = new SGE.Object3D();
+                            reflectHandle.transformComponent.addChild(camerasHandle.transformComponent);
+                            scene.add(reflectHandle);
+                            
+                            function ReflectiveMaterialController(gui) {
+                                                                
+                                var reflMatParams = {
+                                    color: new SGE.Vector4(0.5, 0.5, 0.8, 1.0),
+                                    ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                    diffuse: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                    specular: new SGE.Vector4(0.8, 0.8, 0.8, 16.0),
+
+                                    envMap: dynamicEnvMap,
+                                    reflect: new SGE.Vector4(0.3, 0.3, 0.3, 1.0),
+                                    receiveLight: true,
+                                    uniformScale : true
+                                };
+                                                                
+                                this.material = SGE.makeMaterial(reflMatParams);
+                                
+                                var materialController = new DemoUtils.LitMaterialController(gui, this.material);
+                                var reflectController = new DemoUtils.ColorController(gui, this.material, 'reflect');
+                                var colorController = new DemoUtils.ColorController(gui, this.material, 'color');
+
+                                var materialRebuilder = new DemoUtils.SingleMaterialRebuilder(this.material, reflMatParams);
+                                var _this = this;
+                                materialRebuilder.addEventListener('rebuilt', function () {
+                                    var mat = materialRebuilder.material;
+                                    materialController.dest = mat;
+                                    reflectController.dest = mat;
+                                    colorController.dest = mat;
+                                    _this.material = mat;
+                                });
+                                
+                                this.materialRebuilder = materialRebuilder;
+                                
+                                var envMapTypes = { LERP: '0', MULTIPLY: '1', ADD: '2' };
+                                
+                                var envMapType = envMapTypes.LERP;
+                                var dynamic = true;
+
+                                Object.defineProperties(this, {
+
+                                    dynamic: {
+                                        get: function () {
+                                            return dynamic;
+                                        },
+                                        set: function (v) {
+                                            if (dynamic == v)
+                                                return;
+                                            dynamic = v;
+
+                                            var targetCubeMap;
+
+                                            if (dynamic) {
+                                                targetCubeMap = dynamicEnvMap;
+                                                reflectHandle.transformComponent.addChild(camerasHandle.transformComponent);
+                                            }
+                                            else {
+                                                targetCubeMap = skyBox;
+                                                //removing the 'cube' camera from the scene avoids waste of rendering passes
+                                                reflectHandle.transformComponent.removeChild(camerasHandle.transformComponent);
+                                            }
+
+                                            reflMatParams.envMap = targetCubeMap;
+                                            materialRebuilder.material.envMap = targetCubeMap;                                            
+                                        }
+                                    },
+
+                                    envMapType: {
+                                        get: function () {
+                                            return envMapType;
+                                        },
+                                        set: function (v) {
+                                            if (envMapType == v)
+                                                return;
+                                            
+                                            switch (envMapType) {                                                                                                
+                                                case envMapTypes.MULTIPLY:
+                                                    materialRebuilder.removeParam('envMapMultiply');
+                                                    break;
+                                                case envMapTypes.ADD:
+                                                    materialRebuilder.removeParam('envMapAdd');
+                                                    break;
+                                            }
+
+                                            envMapType = v;
+
+                                            switch (envMapType) {                                                
+                                                case envMapTypes.MULTIPLY:
+                                                    materialRebuilder.addParam('envMapMultiply', true);
+                                                    break;
+                                                case envMapTypes.ADD:
+                                                    materialRebuilder.addParam('envMapAdd', true);
+                                                    break;
+                                            }
+                                            
+                                            materialRebuilder.rebuild();
+                                        }
+                                    }
+                                });
+
+                                gui.add(this, 'envMapType', envMapTypes);
+                                gui.add(this, 'dynamic');
+                            }
+                            
+                            //Reflective objects
+                            var teapot = SGE.GeometryGenerator.parseOBJ(teapotOBJ, true, true)[0].geometry;                            
+                            var teapotBounds = teapot.bounds;
+                            var boundsRadius = teapotBounds.radius;
+                            var sphere = SGE.GeometryGenerator.sphereGeometry(boundsRadius, 150, 150, true, true);
+
+                            var reflectionOrigin = new SGE.Vector3(0.0, boundsRadius, 0.0);
+                            reflectHandle.transformComponent.position = reflectionOrigin;
+                            sphereView.origin = reflectionOrigin;                                                                                  
+                            
+                            var gui = new dat.GUI();
+                            var materialFolder = gui.addFolder('material');
+                            var reflMatController = new ReflectiveMaterialController(materialFolder);                            
+
+                            var sphereRenderComponent = new SGE.MeshRendererComponent(sphere, reflMatController.material, null, true, reflectiveObjectsLayers);
+                            var sphereObject = new SGE.Object3D();
+                            sphereObject.addComponent(sphereRenderComponent);
+                            var sphereTransformComponent = sphereObject.transformComponent;
+
+                            var teapotRenderComponent = new SGE.MeshRendererComponent(teapot, reflMatController.material, null, true, reflectiveObjectsLayers);
+                            var teapotObject = new SGE.Object3D(reflectHandle);
+                            var teapotTransformComponent = teapotObject.transformComponent;
+                            teapotTransformComponent.position = teapotTransformComponent.position.substract(teapotBounds.center);
+                            teapotObject.addComponent(teapotRenderComponent);
+                            
+                            var renderComponents = reflMatController.materialRebuilder.renderComponents;
+                            renderComponents.push(sphereRenderComponent);
+                            renderComponents.push(teapotRenderComponent);
+
+                            var objectController = {
+                                
+                                changeObject: (function () {
+
+                                    var renderingSphere = false;
+                                    var parentTransformComponent = reflectHandle.transformComponent;
+                                    return function () {
+                                        var addTarget;
+                                        var removeTarget;
+                                        if (renderingSphere) {
+                                            addTarget = teapotTransformComponent;
+                                            removeTarget = sphereTransformComponent;
+                                        } else {
+                                            addTarget = sphereTransformComponent;
+                                            removeTarget = teapotTransformComponent;
+                                        }
+
+                                        renderingSphere = !renderingSphere;
+
+                                        parentTransformComponent.removeChild(removeTarget);
+                                        parentTransformComponent.addChild(addTarget);
+                                    };
+
+                                })()
+                            };
+                                                        
+                            gui.add(objectController, 'changeObject');
+                            
+                            //Ground
+                            var groundWidth = boundsRadius * 8;
+                            var groundHeight = groundWidth;
+                            var ground = SGE.GeometryGenerator.gridGeometry(groundWidth, groundHeight, 10, 10, true, true, true);
+                 
+                            var groundMatParams = {
+                                colorMap: groundColorMap,                                
+                                receiveLight: true,
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse: new SGE.Vector4(0.4, 0.4, 0.4, 1.0),
+                                specular: new SGE.Vector4(0.0, 0.0, 0.0, 1.0),
+                                receiveShadows: true,
+                                noWorldTransform : true
+                            };
+
+                            var groundMat = SGE.makeMaterial(groundMatParams);
+                            
+                            var groundObject = new SGE.Object3D();
+                            var groundRenderComponent = new SGE.MeshRendererComponent(ground, groundMat, null, false, commonLayers);
+                            groundObject.addComponent(groundRenderComponent);
+                            scene.add(groundObject);
+                                  
+                            //Animated box 
+                            var boxSize = 1.0;
+                            var box = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize, true, true, true);
+                            var boxMatParams = {
+                                colorMap: boxColorMap,                                
+                                ambient: new SGE.Vector4(0.1, 0.1, 0.1, 1.0),                                
+                                diffuse: new SGE.Vector4(0.5, 0.5, 0.5, 1.0),                                
+                                specular: new SGE.Vector4(0.3, 0.3, 0.3, 20.0),
+                                receiveLight: true,
+                                uniformScale : true
+                            };
+
+                            var boxMat = SGE.makeMaterial(boxMatParams);
+                                                        
+                            var boxPositionHandle = new SGE.Object3D();
+                            boxPositionHandle.transformComponent.position = reflectionOrigin;
+
+                            var boxObject = new SGE.Object3D(boxPositionHandle);
+                            var boxRenderComponent = new SGE.MeshRendererComponent(box, boxMat, null, true, commonLayers);
+                            boxObject.addComponent(boxRenderComponent);
+                            boxObject.transformComponent.position = new SGE.Vector3(boundsRadius + boxSize * Math.SQRT2 /1.5, 0.0, 0.0);
+
+                            scene.add(boxPositionHandle);
+                                                       
+                            var animDuration = 12.0;
+                            var rotateAnim = new SGE.KeyFrameAnimation(SGE.Quaternion);
+                            var yAxis = SGE.VMath.yAxis;                            
+                            rotateAnim.addKey(new SGE.Quaternion().setAxisAngle(yAxis, 0.0), 0.0);
+                            rotateAnim.addKey(new SGE.Quaternion().setAxisAngle(yAxis, Math.PI), animDuration / 2.0);
+                            rotateAnim.addKey(new SGE.Quaternion().setAxisAngle(yAxis, 2.0 * Math.PI), animDuration);
+                            
+                            var animClip = new SGE.AnimationClip(true, animDuration);                           
+
+                            animClip.addCurve(
+                                function () {
+                                    return this.object3D.transformComponent;
+                                },
+                                'quaternion', rotateAnim);
+                            
+                            var animator = new SGE.AnimatorComponent();
+                            animator.addClip('anim1', animClip);
+                            boxObject.addComponent(animator);
+                            animator.play('anim1');
+
+                            animator = new SGE.AnimatorComponent();
+                            animator.addClip('anim1', animClip);
+                            boxPositionHandle.addComponent(animator);
+                            animator.play('anim1');
+                                                                                   
+                            
+                            var lightFolder = gui.addFolder('light');
+                            var lightController = new DemoUtils.DirectionalLightController(lightFolder, dirLight);                                
+                            new DemoUtils.ShadowController(lightFolder, dirLight, lightController, scaleOnDir);
+                            var sceneFolder = gui.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+
+                            //Quality settings
+                            var quality = {
+                                boxBumpMap: false,
+                                groundBumpMap: false,
+                                softShadows: false
+                            };
+
+                            Object.defineProperties(quality, {
+                                envMapSize: (function () {
+
+                                    var envMapSize = pointLight.shadowMapSize.x;
+                                    return {
+
+                                        get: function () {
+                                            return envMapSize;
+                                        },
+                                        set: function (v) {
+                                            if (v == envMapSize)
+                                                return;
+                                            envMapSize = Math.floor(v);
+                                            pointLight.shadowMapSize = pointLight.shadowMapSize.set(v, v);
+                                        }
+                                    };
+
+                                })()
+                            });
+
+                            var qualityFolder = gui.addFolder('quality');
+                            
+                            qualityFolder.add(quality, 'envMapSize', 64, 4096);
+                            
+                            var boxMaterialRebuilder = new DemoUtils.SingleMaterialRebuilder(boxMat, boxMatParams);
+                            boxMaterialRebuilder.renderComponents.push(boxRenderComponent);
+                            qualityFolder.add(quality, 'boxBumpMap').onChange(boxMaterialRebuilder.makeBooleanListener('bumpMap', boxBumpMap));
+
+                            var groundMaterialRebuilder = new DemoUtils.SingleMaterialRebuilder(groundMat, groundMatParams);
+                            groundMaterialRebuilder.renderComponents.push(groundRenderComponent);
+                            qualityFolder.add(quality, 'groundBumpMap').onChange(groundMaterialRebuilder.makeBooleanListener('bumpMap', groundBumpMap));
+                            qualityFolder.add(quality, 'softShadows').onChange(groundMaterialRebuilder.makeBooleanListener('pcf', true));
+                            
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;                            
+                        }
+                    }
+                });
+            });
+            
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

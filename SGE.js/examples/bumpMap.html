@@ -1,0 +1,148 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>        
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>    
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var imageFolder = 'Textures/';
+
+                var images = [
+                    'lambertian.jpg',
+                    'Infinite-Level_02_Tangent_SmoothUV.jpg',
+                    'Map-SPEC.jpg'                    
+                ];
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'moon/';
+
+                var cubeFaces = [
+                    'posx.png',
+                    'negx.png',
+                    'posy.png',
+                    'negy.png',
+                    'posz.png',
+                    'negz.png'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+
+                var colorMap;
+                var bumpMap;
+                var specMap;
+                var skyBox;
+                var headOBJ;
+                var camera;
+                
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                            loadRequests.textFiles.push('Models/head.obj');                            
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages, textFiles) {
+
+                            colorMap = SGE.createTexture(loadedImages[0]);
+                            bumpMap = SGE.createTexture(loadedImages[1]);
+                            specMap = SGE.createTexture(loadedImages[2]);
+
+                            var skyBoxImagesIndex = images.length;
+                            for (var i = 0 ; i < 6; i++)
+                                cubeFaces[i] = loadedImages[skyBoxImagesIndex + i];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+                            headOBJ = textFiles[0];                            
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                                                    
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 100.0 });
+                            camera.skyBox = skyBox;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);
+                            scene.add(cameraObject);                            
+                            
+                            var matParams = {
+                                colorMap: colorMap,
+                                bumpMap: bumpMap,
+                                specMap: specMap,
+                                receiveLight: true,
+                                diffuse: new SGE.Vector4(1.0, 1.0, 1.0, 1.0),
+                                ambient: new SGE.Vector4(0.1, 0.1, 0.1, 1.0),
+                                specular: new SGE.Vector4(0.3, 0.3, 0.3, 5.0),
+                                noWorldTransform: true
+                            };
+                            var mat = SGE.makeMaterial(matParams);
+                            
+                            var headGeom = SGE.GeometryGenerator.parseOBJ(headOBJ, true, true, true)[0].geometry;
+                            cameraObject.addComponent(new DemoUtils.SphereView(headGeom.bounds.center, 0.1, 4.0, 2.0, 0.05));
+
+                            var head = new SGE.Object3D();
+                            var headRenderComponent = new SGE.MeshRendererComponent(headGeom, mat);
+                            head.addComponent(headRenderComponent);
+                            scene.add(head);
+                            
+                            var gui = new dat.GUI();
+                            var materialFolder = gui.addFolder('material');
+                            var materialController = new DemoUtils.LitMaterialController(materialFolder, mat);
+                            var materialRebuilder = new DemoUtils.SingleMaterialRebuilder(mat, matParams);
+                            var enabled = {
+                                bumpMap: true,
+                                specMap: true
+                            };
+                            var bumpMapController = materialFolder.add(enabled, 'bumpMap').onChange(materialRebuilder.makeBooleanListener('bumpMap', bumpMap, materialController));                            
+                            var specMapController = materialFolder.add(enabled, 'specMap').onChange(materialRebuilder.makeBooleanListener('specMap', specMap, materialController));
+                            materialRebuilder.renderComponents.push(headRenderComponent);
+                                                        
+                            var directionalLight = new SGE.DirectionalLight();
+                            directionalLight.castShadows = false;                            
+                            var lightObj = new SGE.Object3D();                            
+                            lightObj.addComponent(directionalLight);             
+                            directionalLight.direction =  new SGE.Vector3(-1.0, -1.0, -0.5);                            
+                            directionalLight.color = new SGE.Vector4(1.0, 1.0, 1.0, 1.0);
+                            scene.add(lightObj);
+                                                                                    
+                            var lightFolder = gui.addFolder('light');
+                            new DemoUtils.DirectionalLightController(lightFolder, directionalLight);
+                            var sceneFolder = gui.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+                            
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

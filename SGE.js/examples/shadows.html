@@ -1,0 +1,244 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>        
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var imageFolder = 'Textures/';
+
+                var images = [
+                    'crate.gif',
+                    'FloorsMarble0023_S.jpg'                    
+                ];
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'sunny/';
+                var cubeExt = '.png';
+
+                var cubeFaces = [
+                    'posx',
+                    'negx',
+                    'posy',
+                    'negy',
+                    'posz',
+                    'negz'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+                cubeFaces.forEach(function (v, i) { cubeFaces[i] = v += cubeExt; });
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+
+                var camera;
+                var skyBox;
+                var boxColorMap;
+                var groundColorMap;
+                
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages) {
+                            boxColorMap = SGE.createTexture(loadedImages[0]);
+                            groundColorMap = SGE.createTexture(loadedImages[1]);
+                            var cubeMapImagesIndex = images.length;
+                            for (var i = 0; i < 6; i++)
+                                cubeFaces[i] = loadedImages[i + cubeMapImagesIndex];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                            
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 250.0 });
+                            camera.cullType = SGE.CullType.DISABLED;
+                            camera.skyBox = skyBox;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            cameraObject.addComponent(new DemoUtils.SphereView());                            
+                            scene.add(cameraObject);
+                            
+                            var groundSize = 20.0;
+
+                            var dirLight = new SGE.DirectionalLight(new SGE.Vector2(512, 512), -0.002);                            
+                            dirLight.castShadows = true;
+                            dirLight.color = new SGE.Vector4(1.0, 1.0, 1.0,1.0);                            
+                            var lightObj = new SGE.Object3D();
+                            lightObj.addComponent(dirLight);
+                            dirLight.direction = new SGE.Vector3(1.0, -1.0, 1.0);
+                            var lightObjTransformComponent = lightObj.transformComponent;
+                            var scaleOnDir = -groundSize*1.5;
+                            lightObjTransformComponent.translateOnAxis(dirLight.direction, scaleOnDir);
+                            dirLight.setVolume(groundSize * Math.SQRT2, -scaleOnDir*2);                            
+                            scene.add(lightObj);
+                                                        
+                            var groundMatParams = {
+                                colorMap: groundColorMap,
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse: new SGE.Vector4(1.0, 1.0, 1.0, 1.0),
+                                specular: new SGE.Vector4(0.1, 0.1, 0.1, 9.0),
+                                receiveLight: true,
+                                receiveShadows: true,
+                                noWorldTransform : true
+                            };
+
+                            var groundMaterial = SGE.makeMaterial(groundMatParams);
+                            var groundMaterialRebuilder = new DemoUtils.SingleMaterialRebuilder(groundMaterial, groundMatParams);
+                                                        
+                            var ground = SGE.GeometryGenerator.gridGeometry(groundSize, groundSize, 10, 10, true, true);
+                            var groundObj = new SGE.Object3D();
+                            var renderComponent = new SGE.MeshRendererComponent(ground, groundMaterial, null, true);
+                            groundMaterialRebuilder.renderComponents.push(renderComponent);
+                            groundObj.addComponent(renderComponent);
+                            scene.add(groundObj);
+
+                            var boxMatParams = {
+                                colorMap: boxColorMap,
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse: new SGE.Vector4(1.0, 1.0, 1.0, 1.0),
+                                specular: new SGE.Vector4(0.1, 0.1, 0.1, 9.0),                                
+                                receiveLight: true,
+                                receiveShadows: true,
+                                uniformScale : true
+                            };
+
+                            var boxMaterial = SGE.makeMaterial(boxMatParams);
+                            var boxMaterialRebuilder = new DemoUtils.SingleMaterialRebuilder(boxMaterial, boxMatParams);
+
+                            var boxSize = groundSize/10.0;
+                            var box = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize*2.0, boxSize, true, true);
+                            var boxObj = new SGE.Object3D(groundObj);
+                            renderComponent = new SGE.MeshRendererComponent(box, boxMaterial, null, true);
+                            boxMaterialRebuilder.renderComponents.push(renderComponent);
+                            boxObj.addComponent(renderComponent);
+                            boxObj.transformComponent.translateY(boxSize).rotateY(Math.PI*0.25);
+                            
+                            var vShader =
+                                [
+                                    'attribute vec3 a_position;',
+                                    'attribute vec2 a_textCoord;',
+                                    'uniform mat4 u_world;',
+                                    'varying vec2 v_textCoord;',
+                                    'void main(){',
+                                        'v_textCoord = a_textCoord;',
+                                        'gl_Position = u_world * vec4(a_position, 1.0);',
+                                    '}',
+                                ].join('\n');
+
+                            var fShader =
+                                [
+                                    'precision mediump float;',
+                                    SGE.Programs.functions.unpackShadows +
+                                    'uniform sampler2D u_colorMap;',
+                                    'varying vec2 v_textCoord;',
+                                    'void main(){',
+                                        'vec4 color = texture2D(u_colorMap, v_textCoord);',
+                                        'gl_FragColor = vec4(unpack(color), 0.0, 0.0, 1.0);',
+                                    '}'
+                                ].join('\n');
+
+                            var quadGeom = SGE.GeometryGenerator.quadGeometry(true);
+                            var quadMat = new SGE.CustomMaterial();
+                            quadMat.vertexShaderSrc = vShader;
+                            quadMat.fragmentShaderSrc = fShader;
+                            quadMat.depthState = SGE.DepthState.ALWAYS;
+                            SGE.SimpleVariable.call(quadMat, 'u_colorMap', 'colorMap');
+                            quadMat.colorMap = dirLight.shadowMapTexture;
+
+                            var debugObj = new SGE.Object3D();
+                            var transformComponent = debugObj.transformComponent;
+                            var scale = 1.0 / 4.0;
+                            transformComponent.position = transformComponent.position.set(1.0 - scale, -1.0 + scale, 0.0);
+                            transformComponent.scale = transformComponent.scale.set(scale, scale, 1.0);
+                            debugObj.addComponent(new SGE.MeshRendererComponent(quadGeom, quadMat, null, false));
+                            scene.add(debugObj);
+                            
+                            var shadowTypes = ['standard', 'shadowLerp', 'pcf' ];
+
+                            var state = {                                
+                                shadowType: shadowTypes[0],
+                                prevShadowType: shadowTypes[0],
+                                showShadowMap : true
+                            };
+                            
+                            var gui = new dat.GUI();
+                            var lightFolder = gui.addFolder('light');
+                            var dirLightController = new DemoUtils.DirectionalLightController(lightFolder, dirLight);
+                            var shadowController = new DemoUtils.ShadowController(gui, dirLight, dirLightController, scaleOnDir);
+
+                            gui.add(state, 'shadowType', shadowTypes).onChange(function (value) {
+                                                                
+                                if (value != shadowTypes[0]) {
+                                    groundMaterialRebuilder.addParam(value, true);
+                                    boxMaterialRebuilder.addParam(value, true);
+                                }
+
+                                var prevType = state.prevShadowType;
+                                if ( prevType != shadowTypes[0]) {
+                                    groundMaterialRebuilder.removeParam(prevType);
+                                    boxMaterialRebuilder.removeParam(prevType);
+                                }
+
+                                state.prevShadowType = value;
+
+                                groundMaterialRebuilder.rebuild();
+                                boxMaterialRebuilder.rebuild();                                
+                            });
+
+                            var showShadowMapController = gui.add(state, 'showShadowMap');
+                            var castShadowController = shadowController.castShadowsController;                            
+                            showShadowMapController.onChange(function (set) {
+                                if (set) {
+                                    scene.add(debugObj);
+                                    if (!castShadowController.getValue())
+                                        castShadowController.setValue(true);                                    
+                                }
+                                else
+                                    scene.remove(debugObj);
+                            });
+                                                        
+                            castShadowController.onChange(function (set) {                                
+                                if (!set && showShadowMapController.getValue()) 
+                                    showShadowMapController.setValue(false);
+                            });
+                                                        
+                            var sceneFolder = gui.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;                            
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp(), { backGroundColor: new SGE.Vector4(0.0, 0.0, 0.0, 1.0) });
+        });
+
+    </script>
+
+</body>
+</html>

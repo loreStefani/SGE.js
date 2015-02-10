@@ -1,0 +1,309 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', 'libs/jquery', '../examples/js/DemoUtils'], function (SGE, $, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+                var colorMap;
+
+                var trianglesCountDiv = $('<div>').css({width: '10%', height : '10%', position : 'absolute', top : '0%', left : '45%', margin : 0, padding : 0});
+                var onStart = this.onStart;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            loadRequests.images.push('Textures/691.jpg');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images) {
+                            colorMap = SGE.createTexture(images[0], null, null, { minification: SGE.TextureFilter.LINEAR_MIPMAP_LINEAR });
+                        }
+                    },
+                                        
+                    createScene: {
+                        value: function (scene) {
+
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            var cameraObject = new SGE.Object3D();
+                            camera.cullType = SGE.CullType.DISABLED;
+                            cameraObject.addComponent(camera);
+                            
+                            var animRadiusStart = 180.0;
+                            var animRadiusEnd = 20.0;
+
+                            var sphereView = new DemoUtils.SphereView(null, animRadiusEnd, animRadiusStart, animRadiusStart);
+                            cameraObject.addComponent(sphereView);
+
+                            scene.add(cameraObject);                            
+
+                            var r = (animRadiusStart - animRadiusEnd) / 2.0;
+                            var cameraAnim = new SGE.KeyFrameAnimation(Number);
+                            cameraAnim.addKey(animRadiusStart, 0.0);
+                            cameraAnim.addKey(r, 4.0);
+                            cameraAnim.addKey(animRadiusEnd, 9.0);
+                            cameraAnim.addKey(r, 14.0);
+                            cameraAnim.addKey(animRadiusStart, 18.0);
+
+                            function getSphereView() {
+                                return sphereView;
+                            }
+                            
+                            var animClip = new SGE.AnimationClip(true);
+                            animClip.addCurve(getSphereView, 'radius', cameraAnim);
+                            animClip.setDurationFromCurves();
+
+                            var animator = new SGE.AnimatorComponent();
+                            cameraObject.addComponent(animator);
+                            animator.addClip('anim1', animClip);
+                                                                                    
+                            var transitionCurve = new SGE.KeyFrameAnimation(Number);
+                            var transitionClip = new SGE.AnimationClip(false);
+                            transitionClip.addCurve(getSphereView, 'radius', transitionCurve);
+                            animator.addClip('transition', transitionClip);
+                            
+                            function LODObject(meshes, maxDistances, material) {
+                                SGE.Object3D.call(this);
+
+                                var renderComponent = new SGE.MeshRendererComponent();
+                                var trianglesCount = [];
+                                var count = meshes.length;
+                                for (var i = 0; i < count ; i++) {
+                                    var mesh = meshes[i];
+                                    renderComponent.addLevel(maxDistances[i], mesh, material);                                    
+                                    trianglesCount[i] = mesh.indexBuffer.data.length / 3;
+                                }
+                                this.addComponent(renderComponent);
+                                this.meshes = meshes;
+                                this.trianglesCount = trianglesCount;
+
+                                var isWireFrame = false;
+
+                                this.swapWireFrame = function (wireFrame) {
+
+                                    if (wireFrame == isWireFrame)
+                                        return;
+                                    isWireFrame = wireFrame;
+                                    var primitiveTopology;
+                                    var mat;
+                                    if (wireFrame) {
+                                        mat = wireFrameMat;
+                                        primitiveTopology = SGE.PrimitiveTopology.LINE_STRIP;
+                                    } else {
+                                        mat = material;
+                                        primitiveTopology = SGE.PrimitiveTopology.TRIANGLES;
+                                    }
+
+                                    for (var i = 0 ; i < count; i++) {
+                                        meshes[i].primitiveTopology = primitiveTopology;
+                                        renderComponent.removeLevelMaterialByIndex(i, 0);
+                                        renderComponent.addLevelMaterials(i, mat);
+                                        
+                                    }
+                                };
+                            }
+                            LODObject.prototype = SGE.Object3D.prototype;
+                            
+                            var distances = [50.0, 80.0, 110.0, 140.0, 170.0];
+                            var material = SGE.makeMaterial({ colorMap: colorMap, noWorldTransform : true });
+                            var wireFrameMat = SGE.makeMaterial({ color: new SGE.Vector4(1.0, 0.0, 0.0, 1.0), noWorldTransform : true });
+                            
+                            var radius = 10.0;
+                            var lodObjects = {
+
+                                sphere: (function () {
+                                                                        
+                                    var meshes =
+                                        [
+                                            SGE.GeometryGenerator.sphereGeometry(radius, 150, 150, true, false, false),
+                                            SGE.GeometryGenerator.sphereGeometry(radius, 100, 100, true, false, false),
+                                            SGE.GeometryGenerator.sphereGeometry(radius, 50, 50, true, false, false),
+                                            SGE.GeometryGenerator.sphereGeometry(radius, 25, 25, true, false, false),
+                                            SGE.GeometryGenerator.sphereGeometry(radius, 12, 12, true, false, false)
+                                        ];
+
+                                    return new LODObject(meshes, distances, material);
+                                })(),
+
+                                cilynder: (function () {
+
+                                    var bottomRadius = radius;
+                                    var topRadius = bottomRadius * 0.5;
+                                    var height = radius * 2.0;
+
+                                    var meshes =
+                                        [
+                                            SGE.GeometryGenerator.cilynderGeometry(bottomRadius, topRadius, height, 150, 150, true, false, false),
+                                            SGE.GeometryGenerator.cilynderGeometry(bottomRadius, topRadius, height, 100, 100, true, false, false),
+                                            SGE.GeometryGenerator.cilynderGeometry(bottomRadius, topRadius, height, 50, 50, true, false, false),
+                                            SGE.GeometryGenerator.cilynderGeometry(bottomRadius, topRadius, height, 25, 25, true, false, false),
+                                            SGE.GeometryGenerator.cilynderGeometry(bottomRadius, topRadius, height, 12, 12, true, false, false)
+                                        ];
+
+
+                                    return new LODObject(meshes, distances, material);
+                                })(),
+
+                                ground: (function () {
+
+                                    var width = 2*radius * Math.SQRT1_2;
+                                    var depth = width;
+
+                                    var meshes =
+                                        [
+                                            SGE.GeometryGenerator.gridGeometry(width, depth, 100, 100, true, false, false),
+                                            SGE.GeometryGenerator.gridGeometry(width, depth, 50, 50, true, false, false),
+                                            SGE.GeometryGenerator.gridGeometry(width, depth, 25, 25, true, false, false),
+                                            SGE.GeometryGenerator.gridGeometry(width, depth, 12, 12, true, false, false),
+                                            SGE.GeometryGenerator.gridGeometry(width, depth, 6, 6, true, false, false)
+                                        ];
+
+                                    var noCullMat = material.clone();
+                                    noCullMat.cullState = SGE.CullState.NONE;
+                                    return new LODObject(meshes, distances, noCullMat);                                    
+                                })()
+                            };
+
+                            function TrianglesCountUpdater() {
+                                SGE.BehaviorComponent.call(this);
+
+                                var currObject = null;
+                                var count = distances.length;
+                                var lastIndex = -1;
+                                var needsUpdate = true;
+                                
+                                Object.defineProperties(this, {
+
+                                    currObject : {
+                                        set: function (obj) {
+                                            currObject = obj;
+                                            needsUpdate = true;
+                                        }
+                                    },
+
+                                    update: {
+                                        value: function () {                                            
+                                            var currRadius = sphereView.radius;
+                                            var index = 0;
+                                            while (index < count-1 && currRadius > distances[index] )
+                                                index++;
+                                            if (index != lastIndex || needsUpdate) {
+                                                $(trianglesCountDiv).text('Triangles Count : ' + currObject.trianglesCount[index]);
+                                                lastIndex = index;
+                                                needsUpdate = false;
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+                            TrianglesCountUpdater.prototype = SGE.BehaviorComponent.prototype;
+
+                            var triangleCountUpdater = new TrianglesCountUpdater();
+                            cameraObject.addComponent(triangleCountUpdater);
+                                                        
+                            var state = {
+                                currObject: 0,
+                                prevObject: 0,
+                                wireFrame: false,
+                                animation: false                                
+                            };
+
+                            var values = {};
+                            var keys = [];
+                            for (var key in lodObjects) {
+                                var len = keys.push(key);
+                                values[key] = len - 1;
+                            }
+                            
+                            var firstObj = lodObjects[keys[0]];
+                            scene.add(firstObj);
+                            triangleCountUpdater.currObject = firstObj;
+                            
+                            var gui = new dat.GUI();
+                            
+                            gui.add(state, 'currObject', values).onChange(function (value) {
+
+                                var obj = lodObjects[keys[value]];
+                                scene.add(obj);
+                                obj.swapWireFrame(state.wireFrame);
+                                triangleCountUpdater.currObject = obj;
+                                scene.remove(lodObjects[keys[state.prevObject]]);                                
+                                state.prevObject = value;
+
+                            });
+
+                            gui.add(state, 'wireFrame').onChange(function (value) {
+                                lodObjects[keys[state.currObject]].swapWireFrame(value);                                
+                            });                            
+                            
+                            function playAnim() {
+                                animator.play('anim1');
+                            }
+                            var animRadiusRange = Math.abs(animRadiusStart - animRadiusEnd);
+                            var transitionLen = 2.0;
+
+                            gui.add(state, 'animation').onChange(function (set) {
+                                if (set) {
+
+                                    var currRadius = sphereView.radius;
+                                    var dist = Math.abs(animRadiusStart - currRadius);
+                                    if ( dist < 1.0 ) {
+                                        playAnim();
+                                        return;
+                                    }
+
+                                    transitionCurve.removeKeys();
+                                    transitionCurve.addKey(currRadius, 0.0);
+                                    transitionCurve.addKey(animRadiusStart, (dist/animRadiusRange) * transitionLen);
+                                    transitionClip.setDurationFromCurves();
+
+                                    animator.play('transition', 1.0, playAnim);
+                                }
+                                else {
+                                    animator.stop('anim1');
+                                    animator.stop('transition');
+                                }
+                            });
+                            
+
+                            return scene;
+                        }
+                    },
+
+                    onStart: {
+                        value: function () {
+                            onStart.apply(this, arguments);
+                            var container = engine.container;
+                            $(container).append(trianglesCountDiv);
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            var engine = new SGE.Engine({ stats: true });
+            engine.run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

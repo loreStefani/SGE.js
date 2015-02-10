@@ -1,0 +1,192 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'envmap_interstellar/';
+
+                var cubeFaces = [
+                    'posx.jpg',
+                    'negx.jpg',
+                    'posy.jpg',
+                    'negy.jpg',
+                    'posz.jpg',
+                    'negz.jpg'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+
+                var skyBox;
+                var camera;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {                                                        
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (images, animFiles) {
+                            var skyBoxImagesIndex = 0;
+                            for (var i = 0 ; i < 6; i++)
+                                cubeFaces[i] = images[skyBoxImagesIndex + i];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 200.0 });
+                            camera.skyBox = skyBox;
+                            camera.renderSortType = SGE.RenderSortType.OPAQUE_FIRST;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);
+                            scene.add(cameraObject);                            
+                                                                   
+                            var size = 1.0;
+                            var panelGeom = SGE.GeometryGenerator.gridGeometry(size, size, 10, 10);
+
+                            var panelsParent = new SGE.Object3D();
+                            panelsParent.transformComponent.rotateZ(Math.PI * 0.5);
+
+                            var state = {
+                                frontPanelBlendState: SGE.BlendState.ALPHA_BLEND,
+                                backPanelBlendState: SGE.BlendState.ALPHA_BLEND,
+                                frontPanelAlpha: 0.399,
+                                backPanelAlpha: 0.799
+                            };
+                            
+                            var frontPanelMaterials = [];
+                            var backPanelMaterials = [];
+                                                       
+                            var rowCount = 3;
+                            var columnCount = 3;
+                            var halfSize = size*0.5;
+                            var startX = - rowCount *  halfSize + halfSize;
+                            var startZ = - columnCount * halfSize + halfSize;
+
+                            function makePanel(parent, alpha, blendState, materials) {                                
+                                for (var i = 0; i < rowCount; i++) {
+                                    var x = startX + i * size;
+                                    for (var j = 0; j < columnCount; j++) {
+                                        var obj = new SGE.Object3D(parent);
+                                        obj.transformComponent.position = new SGE.Vector3(x, 0.0, startZ + j * size);
+                                        var color = new SGE.Vector4().random();
+                                        color.w = alpha;
+                                        var mat = SGE.makeMaterial({ color: color, blendState : blendState, cullState : SGE.CullState.NONE});
+                                        materials.push(mat);
+                                        obj.addComponent(new SGE.MeshRendererComponent(panelGeom, mat));
+                                    }
+                                }
+                            }
+
+                            var frontPanel = new SGE.Object3D(panelsParent);
+                            
+                            makePanel(frontPanel, state.frontPanelAlpha, state.frontPanelBlendState, frontPanelMaterials);
+                            var backPanel = new SGE.Object3D(panelsParent);
+                            makePanel(backPanel, state.backPanelAlpha, state.backPanelBlendState, backPanelMaterials);
+                            
+                            scene.add(panelsParent);
+                            
+                            var frontPanelMaxDistance = 5.0;
+                            cameraObject.addComponent(new DemoUtils.SphereView(null, frontPanelMaxDistance + 1));
+
+                            var frontPanelAnimCurve = new SGE.KeyFrameAnimation(SGE.Vector3);
+                            frontPanelAnimCurve.addKey(new SGE.Vector3(0.0, frontPanelMaxDistance, 0.0), 0.0);
+                            frontPanelAnimCurve.addKey(new SGE.Vector3(0.0, -frontPanelMaxDistance, 0.0), 5.0);
+                            frontPanelAnimCurve.addKey(new SGE.Vector3(0.0, frontPanelMaxDistance, 0.0), 10.0);
+
+                            var clip = new SGE.AnimationClip(true);
+                            clip.addCurve(function () { return this.object3D.transformComponent; }, 'position', frontPanelAnimCurve);
+                            clip.setDurationFromCurves();
+
+                            var frontPanelAnimator = new SGE.AnimatorComponent();
+                            frontPanelAnimator.addClip('move', clip);
+
+                            frontPanel.addComponent(frontPanelAnimator);
+                            frontPanelAnimator.play('move');
+
+                            var gui = new dat.GUI();
+                            gui.add(camera, 'renderSortType', {
+                                'opaque first': SGE.RenderSortType.OPAQUE_FIRST,
+                                'none': SGE.RenderSortType.NONE
+                            });
+
+                            var BlendState = SGE.BlendState;
+                            var values = {};
+                            var intValues = [];
+                            for (var key in BlendState) {
+                                var val = BlendState[key];
+                                values[key] = val;
+                                intValues[val] = val; //this is because dat gives values as strings in OnChange listener
+                            }
+                             
+                            function updateMaterials(materials, f) {
+                                var count = materials.length;
+                                return function (v) {
+                                    for (var i = 0 ; i < count; i++) {
+                                        var mat = materials[i];
+                                        f(mat, v);
+                                    }
+                                };
+                            }
+
+                            function updateMaterialsAlpha(materials) {
+                                return updateMaterials(materials, function (material, alpha) {
+                                    var color = material.color;
+                                    color.w = alpha;
+                                    material.color = color;
+                                });
+                            }
+
+                            function updateMaterialsBlendState(materials) {
+                                return updateMaterials(materials, function (material, blendState) {
+                                    material.blendState = intValues[blendState];//parseInt(blendState, 10);
+                                });
+                            }
+
+                            var frontPanelFolder = gui.addFolder('Front panel');                            
+                            frontPanelFolder.add(state, 'frontPanelAlpha', 0.0, 1.0).name('alpha').onChange(updateMaterialsAlpha(frontPanelMaterials));
+                            frontPanelFolder.add(state, 'frontPanelBlendState', values).name('blendState').onChange(updateMaterialsBlendState(frontPanelMaterials));
+
+                            var backPanelFolder = gui.addFolder('Back panel');
+                            backPanelFolder.add(state, 'backPanelAlpha', 0.0, 1.0).name('alpha').onChange(updateMaterialsAlpha(backPanelMaterials));
+                            backPanelFolder.add(state, 'backPanelBlendState', values).name('blendState').onChange(updateMaterialsBlendState(backPanelMaterials));
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

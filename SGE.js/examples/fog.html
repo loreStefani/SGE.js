@@ -1,0 +1,205 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+                        
+            var MyApp = DemoUtils.DemoInit(function (fogColor) {
+
+                var imageFolder = 'Textures/';
+
+                var images = [
+                    'grass_diffuse.jpg',                    
+                    'grass_diff.jpg',
+                    'tree_oak_branch_d.jpg',
+                    'tree_oak_leaf_d.png',
+                    'tree_oak_trunk_d.jpg',
+                ];
+                                
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+
+                var grassColorMap;
+
+                var grass1OBJ;
+                var treeOBJ;
+                var grassColorMap1;
+
+                var treeBranchColor;
+                var treeLeafColor;
+                var treeTrunkColor;
+
+                var camera;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0 ; i < images.length; i++)
+                                loadRequests.images.push(images[i]);                            
+                            loadRequests.textFiles.push('Models/Grass_01.obj');
+                            loadRequests.textFiles.push('Models/tree_oak.obj');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages, textFiles) {
+                            grassColorMap = SGE.createTexture(loadedImages[0]);
+                            grassColorMap1 = SGE.createTexture(loadedImages[1]);
+                            treeBranchColor = SGE.createTexture(loadedImages[2]);
+                            treeLeafColor = SGE.createTexture(loadedImages[3]);
+                            treeTrunkColor = SGE.createTexture(loadedImages[4]);
+                                                        
+                            grass1OBJ = textFiles[0];                            
+                            treeOBJ = textFiles[1];
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 25.0 });                            
+                            camera.renderSortType = SGE.RenderSortType.OPAQUE_FIRST;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.transformComponent.forward = new SGE.Vector3(1.0, 0.0, 1.0);                            
+                            cameraObject.addComponent(camera);                 
+                            cameraObject.addComponent(new DemoUtils.FPSMove(1.0 / 8.0));
+
+                            scene.add(cameraObject);
+
+                            var groundSize = 100.0;
+                            var halfGroundSize = groundSize / 2.0;
+                            cameraObject.transformComponent.position = new SGE.Vector3(-halfGroundSize, 1.1, -halfGroundSize);
+                            cameraObject.addComponent(new DemoUtils.BoxConstrainer(-halfGroundSize, halfGroundSize, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, -halfGroundSize, halfGroundSize));
+
+                            scene.fogColor = fogColor;
+                            scene.fogStartDistance = 0.0;
+                            scene.fogRange = 10.0;
+                            var gui = new dat.GUI();
+                            var d = groundSize * Math.SQRT2;
+                            gui.add(scene, 'fogStartDistance', 0.0, d);
+                            gui.add(scene, 'fogRange', 1.0, d);
+                            gui.add(camera, 'far', 5.0, d).name('cameraFar');
+
+                            var fogAnimCurve = new SGE.KeyFrameAnimation(Number);
+                            fogAnimCurve.addKey(d, 0.0);                            
+                            fogAnimCurve.addKey(0.0, 4.0);
+
+                            var farPlaneAnimCurve = new SGE.KeyFrameAnimation(Number);
+                            farPlaneAnimCurve.addKey(d, 0.0);
+                            farPlaneAnimCurve.addKey(camera.far, 4.0);
+                            
+                            var fogAnimClip = new SGE.AnimationClip(false, 4.0);
+                            fogAnimClip.addCurve(function () { return scene; }, 'fogStartDistance', fogAnimCurve);
+                            fogAnimClip.addCurve(function () { return camera; }, 'far', farPlaneAnimCurve);
+
+                            var animator = new SGE.AnimatorComponent();
+                            animator.addClip('fogAnim', fogAnimClip);
+                            cameraObject.addComponent(animator);
+                            animator.play('fogAnim', 1.0, function () {                                
+                                cameraObject.addComponent(new DemoUtils.FreeView());                                
+                            });
+                                      
+                            var groundGeom = SGE.GeometryGenerator.gridGeometry(groundSize, groundSize, 50, 50, true, true, true);                            
+                            var groundMat = SGE.makeMaterial({
+                                colorMap: grassColorMap,
+                                textCoordTransform: new SGE.Matrix3().scale(new SGE.Vector3(groundSize, groundSize, 1.0)),
+                                noWorldTransform : true,
+                                fog: true
+                            });
+                                                        
+                            var ground = new SGE.Object3D();                            
+                            ground.addComponent(new SGE.MeshRendererComponent(groundGeom, groundMat));
+                            scene.add(ground);
+                            
+                            function addRandomInGround(scale) {
+                                var obj = new SGE.Object3D();
+                                var transformComponent = obj.transformComponent;
+                                transformComponent.position = new SGE.Vector3(Math.random() * groundSize - halfGroundSize, 0.0, Math.random() * groundSize - halfGroundSize);
+                                transformComponent.quaternion = new SGE.Quaternion().setAxisAngle(SGE.VMath.yAxis, Math.random() * Math.PI);
+                                transformComponent.setUniformScale(scale);
+                                scene.add(obj);
+                                return obj;
+                            }
+                            
+                            var grassMesh = SGE.GeometryGenerator.parseOBJ(grass1OBJ, true)[0].geometry;                            
+                            var grassMaterial = SGE.makeMaterial({
+                                colorMap: grassColorMap1,
+                                fog: true
+                            });                                                    
+
+                            var grassCount = 500;
+                            for (var i = 0; i < grassCount; i++)                     
+                                addRandomInGround(Math.random() * (1.5) + 0.2).addComponent(new SGE.MeshRendererComponent(grassMesh, grassMaterial));
+
+                            var treeMaterials = {
+
+                                'tree_oak_leaf_tree_oak_leaf_d.dds': (function () {
+
+                                    return SGE.makeMaterial({                                        
+                                        colorMap: treeLeafColor,
+                                        blendState: SGE.BlendState.ALPHA_BLEND,
+                                        cullState: SGE.CullState.NONE                                        
+                                    });
+
+                                })(),
+
+                                'tree_oak_trunk_tree_oak_trunk_d.dds': (function () {
+
+                                    return SGE.makeMaterial({
+                                        colorMap: treeTrunkColor,
+                                        fog: true
+                                    });
+
+                                })(),
+
+                                'tree_oak_branch_tree_oak_branch_d.dds': (function () {
+
+                                    return SGE.makeMaterial({
+                                        colorMap: treeBranchColor,
+                                        fog: true
+                                    });
+
+                                })()
+                            };
+
+                            var treeGeom = SGE.GeometryGenerator.parseOBJ(treeOBJ, true);
+                            var meshCount = treeGeom.length;
+                            var treeCount = 100.0;
+                            var treeScale = 1.0 / 4.0;
+                            for (var j = 0; j < treeCount ; j++) {
+                                var tree = addRandomInGround(treeScale);                                
+                                for (var i = 0; i < meshCount; i++) {
+                                    var obj = new SGE.Object3D(tree);
+                                    var subMesh = treeGeom[i];
+                                    obj.addComponent(new SGE.MeshRendererComponent(subMesh.geometry, treeMaterials[subMesh.materialName]));
+                                }                                
+                            }                           
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+            var fogColor = new SGE.Vector4(0.8, 0.8, 0.8, 1.0);
+            new SGE.Engine({ stats: true }).run(new MyApp(fogColor), { backGroundColor: fogColor });
+        });
+
+    </script>
+
+</body>
+</html>

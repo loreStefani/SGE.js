@@ -1,0 +1,217 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils', 'libs/jquery'], function (SGE, DemoUtils, $) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+                
+                var cubeRoot = 'CubeMaps/';
+                var cubeFolder = cubeRoot + 'envmap_interstellar/';
+
+                var cubeFaces = [
+                    'posx.jpg',
+                    'negx.jpg',
+                    'posy.jpg',
+                    'negy.jpg',
+                    'posz.jpg',
+                    'negz.jpg'
+                ];
+
+                cubeFaces.forEach(DemoUtils.addFileFolder(cubeFolder));
+
+                var skyBox;
+
+                var camera;
+                var camera1;
+                var teapotOBJ;
+
+                var blinnPhongDiv = $('<div>').css({ width: '5%', height: '5%', position: 'absolute', top: '0%', left: '25%', padding: 0, margin: 0 }).text('BLINN-PHONG MODEL');
+                var phongDiv = $('<div>').css({ width: '5%', height: '5%', position: 'absolute', top: '0%', left: '75%', padding: 0, margin: 0 }).text('PHONG MODEL');
+                
+                var onStart = this.onStart;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {                                                        
+                            for (var i = 0 ; i < 6; i++)
+                                loadRequests.images.push(cubeFaces[i]);
+                            loadRequests.textFiles.push('Models/wt_teapot.obj');
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages, textFiles) {
+                            var skyBoxImagesIndex = 0;
+                            for (var i = 0 ; i < 6; i++)
+                                cubeFaces[i] = loadedImages[skyBoxImagesIndex + i];
+                            skyBox = SGE.createTextureCube(cubeFaces);
+                            teapotOBJ = textFiles[0];
+                        }
+                    },
+
+                    onStart : {
+                        value: function () {
+                            onStart.apply(this, arguments);
+                            var container = engine.container;
+                            $(container).append(phongDiv).append(blinnPhongDiv);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+
+                            var blinnPhongLayer = 0;
+                            var phongLayer = 1;
+                            
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 100.0 });
+                            camera.skyBox = skyBox;
+                            camera.cullType = SGE.CullType.DISABLED;
+                            camera.renderLayer = blinnPhongLayer;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            scene.add(cameraObject);                           
+
+                            camera1 = camera.clone();
+                            camera1.renderLayer = phongLayer;
+                            var cameraObject1 = new SGE.Object3D();
+                            cameraObject1.addComponent(camera1);                            
+                            scene.add(cameraObject1);
+                            
+                            var teapotGeom = SGE.GeometryGenerator.parseOBJ(teapotOBJ, false, true)[0].geometry;
+                            var teapotBounds = teapotGeom.bounds;
+                            var sphereRadius = teapotBounds.radius;
+                            
+                            var gridSize = sphereRadius * Math.SQRT2;
+                            var gridGeom = SGE.GeometryGenerator.gridGeometry(gridSize, gridSize, 50, 50, false, true);
+
+                            var geometries = [teapotGeom, gridGeom];
+                            var geometryCount = geometries.length;
+
+                            var minRadius = sphereRadius + 1.0;
+                            var maxRadius = 6.0 * sphereRadius;
+                            var radiusStep = (maxRadius - minRadius) / 100.0;
+
+                            var origin = teapotBounds.center;
+                            cameraObject.addComponent(new DemoUtils.SphereView(origin, minRadius, maxRadius, maxRadius, radiusStep));
+                            cameraObject1.addComponent(new DemoUtils.SphereView(origin, minRadius, maxRadius, maxRadius, radiusStep));
+
+                            var matParams = {
+                                color: new SGE.Vector4(0.1, 0.3, 0.1, 1.0),
+                                receiveLight: true,
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse: new SGE.Vector4(0.4, 0.8, 0.4, 1.0),
+                                specular: new SGE.Vector4(0.4, 0.6, 0.4, 16.0),
+                                noWorldTransform : true
+                            };
+
+                            var blinnPhongMat = SGE.makeMaterial(matParams);
+                            
+                            var blinnPhongObjects = [];
+                            var phongObjects = [];
+                            
+                            function createObjects(dest, mat, layer) {
+                                for (var i = 0; i < geometryCount; i++) {
+                                    var object = new SGE.Object3D();
+                                    var renderer = new SGE.MeshRendererComponent(geometries[i], mat, null, false, layer);
+                                    object.addComponent(renderer);
+                                    dest[i] = object;
+                                } 
+                            }
+                            
+                            createObjects(blinnPhongObjects, blinnPhongMat, blinnPhongLayer);
+
+                            matParams.phong = true;
+                            var phongMat = SGE.makeMaterial(matParams);
+
+                            createObjects(phongObjects, phongMat, phongLayer);
+                            
+                            var gui = new dat.GUI();
+
+                            var materialFolder = gui.addFolder('material');
+                            var colorController = new DemoUtils.ColorController(materialFolder, blinnPhongMat, 'color');
+                            var materialController = new DemoUtils.LitMaterialController(materialFolder, blinnPhongMat);
+
+                            materialController.addMirrorMaterial(phongMat);
+                                                        
+                            colorController.addEventListener('changed', function () {
+                                phongMat.color = blinnPhongMat.color;
+                            });
+                            
+                            var light = new SGE.DirectionalLight();
+                            var lightObject = new SGE.Object3D();
+                            lightObject.addComponent(light);
+                            light.castShadows = false;
+                            light.color = new SGE.Vector4(0.7, 0.7, 0.7, 1.0);
+                            light.direction = new SGE.Vector3(-1.0, -1.0, 0.0);                                                        
+                            scene.add(lightObject);
+                                                        
+                            var lightFolder = gui.addFolder('light');                            
+                            new DemoUtils.DirectionalLightController(lightFolder, light);
+
+                            var sceneFolder = gui.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+
+                            var currObject = 0;
+                            scene.add(blinnPhongObjects[currObject]);
+                            scene.add(phongObjects[currObject]);
+
+                            var geometryController = {
+
+                                changeGeometry: function () {
+                                    var nextObject = (currObject + 1) % geometryCount;
+                                    scene.add(blinnPhongObjects[nextObject]);
+                                    scene.add(phongObjects[nextObject]);
+                                    scene.remove(blinnPhongObjects[currObject]);
+                                    scene.remove(phongObjects[currObject]);
+                                    currObject = nextObject;
+                                }
+                            };
+
+                            gui.add(geometryController, 'changeGeometry');
+                    
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            
+                            var w = width / 2;
+                            var h = height;
+                            
+                            var aspect = w / h;
+
+                            camera.aspectRatio = aspect;
+                            camera1.aspectRatio = aspect;
+
+                            if (camera.viewPort != null)
+                                camera.viewPort.release();
+                            if (camera1.viewPort != null)
+                                camera1.viewPort.release();
+
+                            camera.viewPort = SGE.createViewPort(w, h, 0, 0);
+                            camera1.viewPort = SGE.createViewPort(w,h, w, 0);                            
+                        }
+                    }
+                });
+            });
+
+            var engine =  new SGE.Engine({ stats: true });
+            engine.run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

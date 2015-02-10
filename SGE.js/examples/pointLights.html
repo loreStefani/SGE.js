@@ -1,0 +1,239 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>    
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+                        
+            var MyApp = DemoUtils.DemoInit(function () {
+                
+                var imageFolder = 'Textures/';
+
+                var images = [
+                    'FloorsMarble0023_S.jpg',
+                    'FloorsMarble0023_S_NRM.jpg',
+                    'FloorsMarble0023_S_SPEC.jpg'
+                ];
+
+                images.forEach(DemoUtils.addFileFolder(imageFolder));
+
+                var camera;
+                var colorMap;
+                var bumpMap;
+                var specMap;
+
+                Object.defineProperties(this, {
+
+                    onLoadResources: {
+                        value: function (loadRequests) {
+                            for (var i = 0; i < images.length; i++)
+                                loadRequests.images.push(images[i]);
+                        }
+                    },
+
+                    onResourceLoaded: {
+                        value: function (loadedImages) {
+                            colorMap = SGE.createTexture(loadedImages[0]);
+                            bumpMap = SGE.createTexture(loadedImages[1]);
+                            specMap = SGE.createTexture(loadedImages[2]);
+                        }
+                    },
+
+                    createScene: {
+                        value: function (scene) {
+                                                        
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 500.0 });
+                            camera.cullType = SGE.CullType.DISABLED;
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);                            
+                            scene.add(cameraObject);
+                                                        
+                            var viewContainerSize = 30.0;
+                            var halfViewContainerSize = viewContainerSize * 0.5;
+                            var lightGeomSize = viewContainerSize / 50.0;
+                            var lightGeom = SGE.GeometryGenerator.sphereGeometry(lightGeomSize, 30, 30);
+                            var sceneSize = viewContainerSize * Math.sqrt(3.0);
+                            scene.sceneSize = sceneSize;
+                            cameraObject.addComponent(new DemoUtils.SphereView(null, null, sceneSize / 2.0 - 5.0));
+                            
+                            var shadowMapSize = 256;
+                            var shadowBias = -0.05;
+                            var attenuation = new SGE.Vector3(0.001, 0.001, 0.1001);
+                            var range = sceneSize;
+                            var maxRange = sceneSize * 2.0;                            
+                            var animLen = 10.0;
+                            var halfAnimLen = animLen / 2.0;
+
+                            function getTransformComponent() {
+                                return this.object3D.transformComponent;
+                            }
+
+                            var enabledCount = 0;
+
+                            function addPointLight(gui, position, color, axis) {
+                                
+                                var pointLight = new SGE.PointLight(new SGE.Vector2(256, 256), -0.05);
+                                pointLight.castShadows = false;                                
+                                pointLight.color = color;
+                                pointLight.range = range;
+                                pointLight.attenuation = attenuation;                                
+                                
+                                new DemoUtils.ColorController(gui, pointLight, 'color');
+                                gui.add(pointLight, 'range', 0.0, maxRange);
+                                new DemoUtils.Vector3Controller(gui, pointLight, 'attenuation', ['constant', 'distance', 'squaredDistance'], [0.0, 0.0, 0.0], [2.0, 2.0, 2.0]);
+                                new DemoUtils.ShadowController(gui.addFolder('shadows'), pointLight);
+
+                                var lightHandle = new SGE.Object3D();
+                                var lightObj = new SGE.Object3D(lightHandle);
+                                lightObj.transformComponent.position = position;
+                                lightObj.addComponent(pointLight);
+                                var mat = SGE.makeMaterial({ color: pointLight.color });
+                                pointLight.addEventListener('colorChanged', function () {
+                                    mat.color = pointLight.color;
+                                });
+                                lightObj.addComponent(new SGE.MeshRendererComponent(lightGeom, mat, null, false));
+                                
+                                var lightAnim = new SGE.KeyFrameAnimation(SGE.Quaternion);
+                                lightAnim.addKey(new SGE.Quaternion().setAxisAngle(axis, 0.0), 0.0);
+                                lightAnim.addKey(new SGE.Quaternion().setAxisAngle(axis, Math.PI), halfAnimLen);
+                                lightAnim.addKey(new SGE.Quaternion().setAxisAngle(axis, Math.PI * 2.0), animLen);
+
+                                var lightAnimClip = new SGE.AnimationClip(true, animLen);
+                                lightAnimClip.addCurve(getTransformComponent, 'quaternion', lightAnim);
+
+                                var lightAnimator = new SGE.AnimatorComponent();
+                                lightAnimator.addClip('orbit', lightAnimClip);
+                                lightHandle.addComponent(lightAnimator);
+                                lightAnimator.play('orbit');
+
+                                enabledCount++;
+                                scene.add(lightHandle);
+                                
+                                var state = {
+                                    enabled : true
+                                };
+                                
+                                var enabledController = gui.add(state, 'enabled');
+                                enabledController.onChange(function (set) {
+                                    if (set) {
+                                        enabledCount++;
+                                        scene.add(lightHandle);
+                                    }
+                                    else {
+
+                                        if (enabledCount == 1) {
+                                            state.enabled = true;
+                                            return;
+                                        }
+                                        enabledCount--;
+                                        scene.remove(lightHandle);
+                                    }
+                                });
+                            }
+
+                            var quarterViewContainerSize = halfViewContainerSize / 2.0;
+                            var gui = new dat.GUI();
+                            var lightFolder = gui.addFolder('light1');
+                            addPointLight(lightFolder, new SGE.Vector3(quarterViewContainerSize, 0.0, 0.0), new SGE.Vector4(1.0, 0.0, 0.0, 1.0), SGE.VMath.zAxis);
+                            var lightFolder1 = gui.addFolder('light2');                            
+                            addPointLight(lightFolder1, new SGE.Vector3(0.0, 0.0, quarterViewContainerSize), new SGE.Vector4(0.0, 1.0, 0.0, 1.0), SGE.VMath.xAxis);
+                            var lightFolder2 = gui.addFolder('light3');                            
+                            addPointLight(lightFolder2, new SGE.Vector3(-quarterViewContainerSize, 0.0, 0.0), new SGE.Vector4(0.0, 0.0, 1.0, 1.0), SGE.VMath.yAxis);
+
+                            var gridGeom = SGE.GeometryGenerator.gridGeometry(viewContainerSize, viewContainerSize, 50, 50, true, true, true);
+                            gridGeom.makeBoundsAABB();
+                            var matParams = {
+                                colorMap: colorMap,
+                                bumpMap: bumpMap,
+                                specMap: specMap,
+                                receiveLight: true,
+                                ambient: new SGE.Vector4(0.2, 0.2, 0.2, 1.0),
+                                diffuse: new SGE.Vector4(1.0, 1.0, 1.0, 1.0),
+                                specular: new SGE.Vector4(1.0, 1.0, 1.0, 9.0),
+                                receiveShadows: true
+                            };
+                            var mat = SGE.makeMaterial(matParams);
+
+                            var materialFolder = gui.addFolder('material');
+                            var materialController = new DemoUtils.LitMaterialController(materialFolder, mat);
+
+                            scene.ambientLight = new SGE.Vector4(0.3, 0.3, 0.3, 1.0);
+                            var sceneFolder = gui.addFolder('scene');
+                            new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
+
+                            var quality = {
+                                bumpMap: true,
+                                specularMap : true
+                            };
+
+                            var materialRebuilder = new DemoUtils.SingleMaterialRebuilder(mat, matParams);
+                            var renderComponents = materialRebuilder.renderComponents;
+                            var qualityFolder = gui.addFolder('quality');
+                            qualityFolder.add(quality, 'bumpMap').onChange(materialRebuilder.makeBooleanListener('bumpMap', bumpMap, materialController));
+                            qualityFolder.add(quality, 'specularMap').onChange(materialRebuilder.makeBooleanListener('specMap', specMap, materialController));
+                            
+                            var viewContainer = new SGE.Object3D();
+
+                            function addContainerSide() {
+                                var side = new SGE.Object3D(viewContainer);
+                                var renderComponent = new SGE.MeshRendererComponent(gridGeom, mat);
+                                side.addComponent(renderComponent);
+                                renderComponents.push(renderComponent);
+                                return side;
+                            }                           
+
+                            var bottom = addContainerSide();
+                            bottom.transformComponent.translateY(-halfViewContainerSize);
+
+                            var top = addContainerSide();
+                            top.transformComponent.translateY(halfViewContainerSize).rotateX(Math.PI);
+
+                            var right = addContainerSide();
+                            right.transformComponent.translateX(halfViewContainerSize).rotateZ(Math.PI * 0.5);
+
+                            var left = addContainerSide();
+                            left.transformComponent.translateX(-halfViewContainerSize).rotateZ(-Math.PI * 0.5);
+
+                            var front = addContainerSide();
+                            front.transformComponent.translateZ(-halfViewContainerSize).rotateX(Math.PI * 0.5);
+
+                            var back = addContainerSide();
+                            back.transformComponent.translateZ(halfViewContainerSize).rotateX(-Math.PI * 0.5);
+
+                            scene.add(viewContainer);
+                                                                                    
+                            var boxSize = viewContainerSize / 10.0;
+                            var boxGeom = SGE.GeometryGenerator.boxGeometry(boxSize, boxSize, boxSize, true, true, true);
+                            var box = new SGE.Object3D();
+                            var renderComponent = new SGE.MeshRendererComponent(boxGeom, mat);
+                            box.addComponent(renderComponent);
+                            scene.add(box);
+
+                            renderComponents.push(renderComponent);                                                
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+                        
+            new SGE.Engine({ stats: true }).run(new MyApp(), { backGroundColor: new SGE.Vector4(0.0, 0.0, 0.0, 1.0) });
+        });
+
+    </script>
+
+</body>
+</html>
