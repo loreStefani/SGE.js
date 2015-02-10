@@ -1,0 +1,6 @@
+created by Jockum Skoglund aka hipshot (http://www.zfight.com/)
+-envmap_interstellar
+
+created by Heiko Irrgang (http://gamvas.com)
+-moon
+-sunny
