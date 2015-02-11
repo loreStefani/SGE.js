@@ -1,2 +1,2 @@
-# -work-in-progress-name-SGE.js
+# SGE.js  Simple Graphics Engine
 A WebGL Rendering engine
