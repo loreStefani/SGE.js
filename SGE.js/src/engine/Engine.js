@@ -1,5 +1,5 @@
 ﻿define(['./renderSystem/RenderSystem', 'core/Device', './animationSystem/AnimationSystem', './behaviorSystem/BehaviorSystem', './Scene', 'loaders/ResourceLoader',
-    'loaders/ImageLoader', 'loaders/TextFileLoader', 'core/Pools', 'libs/jquery', 'libs/Stats'],
+    'loaders/ImageLoader', 'loaders/TextfileLoader', 'core/Pools', 'libs/jquery', 'libs/Stats'],
 
     function (RenderSystem, Device, AnimationSystem, BehaviorSystem, Scene, ResourceLoader, ImageLoader, TextFileLoader, Pools, $, Stats) {
 
