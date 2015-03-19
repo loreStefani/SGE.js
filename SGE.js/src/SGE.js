@@ -22,7 +22,7 @@
         'engine/TransformComponent',
         'engine/behaviorSystem/BehaviorComponent',
 
-        'loaders/Loader', 'loaders/ImageLoader', 'loaders/TextFileLoader', 'loaders/ResourceLoader',
+        'loaders/Loader', 'loaders/ImageLoader', 'loaders/TextfileLoader', 'loaders/ResourceLoader',
 
         'Utils'
     ],
