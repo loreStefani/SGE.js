@@ -127,14 +127,21 @@
                 clearDepth: null,
                 pendingClearColor: false,
                 pendingClearDepth: false,
-                                        
+
                 //limits
                 limits: {
                     MAX_COMBINED_TEXTURE_IMAGE_UNITS: null,
                     MAX_TEXTURE_SIZE: null,
                     MAX_CUBE_MAP_TEXTURE_SIZE: null,
                     MAX_RENDERBUFFER_SIZE: null                    
-                }
+                },
+
+                //extensions
+                floatTextures_EXT: null,
+                floatTexturesLinearFilter_EXT : false,
+                floatRenderTarget_EXT: null,
+                multipleRenderTargets_EXT: null,
+                multipleRenderTargetsCount_EXT : 0                                       
             };
         
             setupContextLostHandling(gl, canvas, state);
@@ -515,6 +522,20 @@
 
                 state.clearColor = state.defaultClearColor;
                 state.clearDepth = state.defaultClearDepth;
+
+                //extensions
+                state.floatTextures_EXT = gl.getExtension('OES_texture_float');
+                if (state.floatTextures_EXT != null)
+                    state.floatTexturesLinearFilter_EXT = gl.getExtension('OES_texture_float_linear') != null;
+                else
+                    state.floatTexturesLinearFilter_EXT = false;
+
+                state.floatRenderTarget_EXT = gl.getExtension('WEBGL_color_buffer_float');
+                state.multipleRenderTargets_EXT = gl.getExtension('WEBGL_draw_buffers');
+                if (state.multipleRenderTargets_EXT != null)
+                    state.multipleRenderTargetsCount_EXT = gl.MAX_COLOR_ATTACHMENTS_WEBGL;
+                else
+                    state.multipleRenderTargetsCount_EXT = 0;
 
                 setImplDefault(gl, state);
             };
@@ -906,6 +927,8 @@
             switch (imageDataType) {
                 case Textures.ImageDataType.UNSIGNED_BYTE:
                     return gl.UNSIGNED_BYTE;
+                case Textures.ImageDataType.FLOAT:
+                    return gl.FLOAT;
                 default:
                     throw new Error('invalid image data type');
             }
@@ -1651,6 +1674,23 @@
                     if (width > maxWidth || height > maxHeight)
                         throw new Error('invalid texture size');
 
+                    //check float availability/requirements
+                    if (texture.imageDataType == Textures.ImageDataType.FLOAT) {
+
+                        if (state.floatTextures_EXT == null)
+                            throw new Error('float textures not supported');
+                                       
+                        var textureMinification = texture.minification;
+                        var textureFilters = Textures.TextureFilter;
+                        var linearFilter = textureFilters.LINEAR;
+                        var useLinearFilter = texture.magnification == linearFilter || 
+                            textureMinification == linearFilter || textureMinification == textureFilters.LINEAR_MIPMAP_LINEAR
+                            || textureMinification == textureFilters.NEAREST_MIPMAP_LINEAR;
+                        
+                        if(useLinearFilter && !state.floatTexturesLinearFilter_EXT)
+                            throw new Error('linear texture filter not supported for float textures');                        
+                    }
+
                     //create and temporary bind a new webgl texture object
                     var glTexture = gl.createTexture();
 
@@ -1851,6 +1891,18 @@
 
                 //get color texture
                 var colorTexture = renderTarget.colorTexture;
+
+                //check for MRT
+                if (colorTexture instanceof Array) {
+                                        
+                    if (state.multipleRenderTargets_EXT == null)
+                        throw new Error('MRT not supported');
+                    var colorTextureCount = colorTexture.length;
+                    if (state.multipleRenderTargetsCount_EXT < colorTextureCount)
+                        throw new Error('MRT count not supported');
+                    //TODO
+                }
+
 
                 var width = colorTexture.width;
                 var height = colorTexture.height;

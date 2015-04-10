@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <script src="js/dat.gui.js"></script>
+    <script data-main="../src/config.js" src="../src/require.js"></script>
+</head>
+<body>
+
+    <script type="text/javascript">
+
+        requirejs(['SGE', '../examples/js/DemoUtils'], function (SGE, DemoUtils) {
+
+            'use strict';
+
+            var MyApp = DemoUtils.DemoInit(function () {
+
+                var camera;
+
+                Object.defineProperties(this, {
+                                        
+                    createScene: {
+                        value: function (scene) {
+
+                            camera = new SGE.Camera({ isPerspective: true, fovY: Math.PI * 0.25, near: 0.1, far: 100.0 });                            
+                            var cameraObject = new SGE.Object3D();
+                            cameraObject.addComponent(camera);
+                            cameraObject.addComponent(new DemoUtils.SphereView());
+                            scene.add(cameraObject);
+
+                            var colorMap = new SGE.createTexture(new Float32Array(
+                                    [
+                                        0.8, 0.0, 1.0, 1.0,
+                                        0.1, 1.0, 0.0, 1.0
+                                    ]),
+                                2, 1,
+                                { imageDataType: SGE.ImageDataType.FLOAT, minification: SGE.TextureFilter.LINEAR_MIPMAP_LINEAR });
+
+                            var head = new SGE.Object3D();
+                            var matParams = { colorMap: colorMap };
+                            var mat = SGE.makeMaterial(matParams);
+                            var cubeGeom = SGE.GeometryGenerator.boxGeometry(1.0, 1.0, 1.0, true);
+                            var headRenderComponent = new SGE.MeshRendererComponent(cubeGeom, mat);
+                            head.addComponent(headRenderComponent);
+                            scene.add(head);                                                        
+
+                            return scene;
+                        }
+                    },
+
+                    onResize: {
+                        value: function (width, height) {
+                            camera.aspectRatio = width / height;
+                        }
+                    }
+                });
+            });
+
+            new SGE.Engine({ stats: true }).run(new MyApp());
+        });
+
+    </script>
+
+</body>
+</html>

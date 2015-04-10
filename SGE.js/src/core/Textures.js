@@ -8,7 +8,8 @@
     });
 
     var ImageDataType = Object.freeze({
-        UNSIGNED_BYTE: 0
+        UNSIGNED_BYTE: 0,
+        FLOAT: 1
     });
 
     var TextureFilter = Object.freeze({
@@ -382,9 +383,9 @@
 
         if (colorTexture == null || (colorTexture instanceof TextureCube && cubeMapFace == null))
             throw new Error('invalid parameter');
-
+        
         EventTarget.call(this);
-                
+        
         generateMipMaps = generateMipMaps != null ? generateMipMaps : true;
 
         var released = false;
@@ -396,7 +397,14 @@
             };
         }).call(this);
 
-        colorTexture.addEventListener(releasedEvent,onColorTextureReleased);
+        var colorTextureCount = 1;
+        if (colorTexture instanceof Array) {
+            colorTextureCount = colorTexture.length;
+            for (var i = 0; i < colorTextureCount; i++) 
+                colorTexture[i].addEventListener(releasedEvent, onColorTextureReleased);           
+
+        }else
+            colorTexture.addEventListener(releasedEvent,onColorTextureReleased);
 
         Object.defineProperties(this, {
 
@@ -427,7 +435,11 @@
                     if (released) 
                         return;
                     released = true;
-                    colorTexture.removeEventListener(releasedEvent, onColorTextureReleased);
+                    if (colorTexture instanceof Array)
+                        for (var i = 0; i < colorTextureCount; i++)
+                            colorTexture[i].removeEventListener(releasedEvent, onColorTextureReleased);
+                    else
+                        colorTexture.removeEventListener(releasedEvent, onColorTextureReleased);
                     this.trigger(releasedEvent);
                     renderTargetPool.release(this);                                         
                 },

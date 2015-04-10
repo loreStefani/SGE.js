@@ -59,6 +59,7 @@
     <Content Include="examples\CubeMaps\envmap_interstellar\README.TXT" />
     <Content Include="examples\CubeMaps\moon\LICENSE.txt" />
     <Content Include="examples\CubeMaps\sunny\LICENSE.txt" />
+    <Content Include="examples\floatTexture.html" />
     <Content Include="examples\displMap.html" />
     <Content Include="examples\celShading.html" />
     <Content Include="examples\contextLost.html" />
