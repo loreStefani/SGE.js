@@ -151,7 +151,8 @@
                                     'varying vec2 v_textCoord;',
                                     'void main(){',
                                         'vec4 color = texture2D(u_colorMap, v_textCoord);',
-                                        'gl_FragColor = vec4(unpack(color), 0.0, 0.0, 1.0);',
+                                        'float d = unpack(color);',
+                                        'gl_FragColor = vec4(d, d, d, 1.0);',
                                     '}'
                                 ].join('\n');
 
@@ -219,7 +220,7 @@
                                 if (!set && showShadowMapController.getValue()) 
                                     showShadowMapController.setValue(false);
                             });
-                                                        
+                            
                             var sceneFolder = gui.addFolder('scene');
                             new DemoUtils.ColorController(sceneFolder, scene, 'ambientLight');
 

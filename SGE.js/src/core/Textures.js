@@ -27,12 +27,17 @@
         CLAMP_TO_EDGE: 2
     });
 
+    var DepthDataType = Object.freeze({
+        SHORT: 0,
+        FLOAT: 1
+    });
+
     var TextureType = Object.freeze({
         Texture: 0,
         TextureCube: 1,
         RenderTarget : 2
     });
-                                
+                                        
     var dataChangedEvent = 'dataChanged';
     var sizeChangedEvent = 'sizeChanged';
     var parametersChangedEvent = 'parametersChanged';
@@ -379,14 +384,22 @@
         NEGATIVE_Z: 5
     });
                 
-    function RenderTarget(colorTexture, cubeMapFace, generateMipMaps) {
+    function RenderTarget(colorTexture, cubeMapFace, generateMipMaps, depthDataType) {
 
         if (colorTexture == null || (colorTexture instanceof TextureCube && cubeMapFace == null))
             throw new Error('invalid parameter');
+
+        var colorTextureCount = 1;
+        if (colorTexture instanceof Array) {
+            colorTextureCount = colorTexture.length;
+            if (colorTextureCount <= 1)
+                throw new Error('invalid parameter');
+        }
         
         EventTarget.call(this);
         
         generateMipMaps = generateMipMaps != null ? generateMipMaps : true;
+        depthDataType = depthDataType != null ? depthDataType : DepthDataType.SHORT;
 
         var released = false;
 
@@ -397,14 +410,13 @@
             };
         }).call(this);
 
-        var colorTextureCount = 1;
-        if (colorTexture instanceof Array) {
-            colorTextureCount = colorTexture.length;
-            for (var i = 0; i < colorTextureCount; i++) 
-                colorTexture[i].addEventListener(releasedEvent, onColorTextureReleased);           
-
-        }else
-            colorTexture.addEventListener(releasedEvent,onColorTextureReleased);
+        
+        if (colorTexture instanceof Array)
+            for (var i = 0; i < colorTextureCount; i++)
+                colorTexture[i].addEventListener(releasedEvent, onColorTextureReleased);
+         else             
+            colorTexture.addEventListener(releasedEvent, onColorTextureReleased);            
+        
 
         Object.defineProperties(this, {
 
@@ -430,16 +442,22 @@
                 configurable : true
             },
 
+            depthDataType : {
+                value: depthDataType,
+                configurable: true
+            },
+
             release: {
                 value: function () {
                     if (released) 
                         return;
                     released = true;
-                    if (colorTexture instanceof Array)
+                    if (colorTextureCount > 1)
                         for (var i = 0; i < colorTextureCount; i++)
                             colorTexture[i].removeEventListener(releasedEvent, onColorTextureReleased);
                     else
                         colorTexture.removeEventListener(releasedEvent, onColorTextureReleased);
+                    
                     this.trigger(releasedEvent);
                     renderTargetPool.release(this);                                         
                 },
@@ -474,7 +492,8 @@
         ImageDataType: ImageDataType,
         ImageFormat: ImageFormat,
         TextureFilter: TextureFilter,
-        TextureWrapMode : TextureWrapMode,
+        TextureWrapMode: TextureWrapMode,
+        DepthDataType : DepthDataType,
         TextureType : TextureType,
 
         createTexture: function (imageData, width, height, parameters) {                

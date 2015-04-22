@@ -92,6 +92,7 @@
     <Content Include="examples\js\spin.js" />
     <Content Include="examples\lod.html" />
     <Content Include="examples\Models\CREDITS.txt" />
+    <Content Include="examples\Models\Fruits.obj" />
     <Content Include="examples\Models\Grass_01.obj" />
     <Content Include="examples\Models\head.OBJ" />
     <Content Include="examples\Models\model.json" />
@@ -105,6 +106,7 @@
     <Content Include="examples\Models\zombie_skinning_test.json" />
     <Content Include="examples\Models\zombie_walking.json" />
     <Content Include="examples\Models\zombie_walking_zombie.json" />
+    <Content Include="examples\mrt.html" />
     <Content Include="examples\multiViews.html" />
     <Content Include="examples\normals.html" />
     <Content Include="examples\bumpMap.html" />
@@ -116,6 +118,7 @@
     <Content Include="examples\shadows.html" />
     <Content Include="examples\skinning.html" />
     <Content Include="examples\spotLights.html" />
+    <Content Include="examples\SSAO.html" />
     <Content Include="examples\start.html" />
     <Content Include="examples\Textures\691.jpg" />
     <Content Include="examples\Textures\bumpMap.png" />

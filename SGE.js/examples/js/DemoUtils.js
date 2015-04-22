@@ -55,7 +55,7 @@
 
         DemoApp.prototype = Object.create(SGE.Application.prototype);
         Object.defineProperty(DemoApp.prototype, 'constructor', { value: DemoApp });
-        return DemoApp;                
+        return DemoApp;
     }
 
     function addFileFolder(folder) {

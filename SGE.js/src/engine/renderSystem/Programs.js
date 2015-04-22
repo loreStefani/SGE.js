@@ -121,6 +121,8 @@
 
         bumpMap: 'BUMP_MAP',
         displacementMap: 'DISPL_MAP',
+
+        ssaoMap : 'SSAO_MAP',
         
         light: 'LIGHT',
         shadows : 'SHADOWS',
@@ -247,7 +249,12 @@
         ifDef(
             Defines.envMap,
             define(Defines.normals, null, true) +
-            define(Defines.eyePos), true);
+            define(Defines.eyePos), true) + 
+        
+        ifCond(
+            definedCond(Defines.ssaoMap) + ' && !' +
+            definedCond(Defines.light),
+            undefine(Defines.ssaoMap), true);
 
     Defines.dependencies.vertexShader =
 
@@ -290,6 +297,7 @@
 
         varyings: {
             worldPosition: 'v_position',
+            clipPosition : 'v_positionClip',
             worldNormal: 'v_normal',
             textCoord: 'v_textCoord',
             worldTangent: 'v_tangent',
@@ -339,6 +347,8 @@
             materialReflect: 'u_matReflect',
 
             ambientLight: 'u_ambientLight',
+
+            ssaoMap:'u_ssaoMap',
 
             colorMap: 'u_colorMap',
             bumpMap: 'u_bumpMap',
@@ -654,6 +664,8 @@
 
                     worldPosition: declareVarying('vec3', names.worldPosition),
 
+                    clipPosition : ifDef(Defines.ssaoMap, declareVarying('vec4', names.clipPosition) ),
+
                     worldNormal: ifDef( Defines.normals, declareVarying('vec3', names.worldNormal) ),
 
                     textCoord: ifDef( Defines.textCoords, declareVarying('vec2', names.textCoord) ),
@@ -812,6 +824,11 @@
                             Defines.light,
                             declareUniform('vec4', names.materialAmbient, true) +
                             declareUniform('vec4', names.ambientLight)),
+
+                    ssaoMap : 
+                        ifDef(
+                            Defines.ssaoMap,
+                            declareUniform('sampler2D', names.ssaoMap)),
                     
                     directionalLights: 
                         ifDef(
@@ -1233,7 +1250,8 @@
             uniforms.shadowSpotLights+
             uniforms.displMap + 
             
-            varyings.worldPosition + 
+            varyings.worldPosition +
+            varyings.clipPosition +
             varyings.worldNormal  + 
             varyings.textCoord+ 
             varyings.worldTangent + 
@@ -1279,7 +1297,10 @@
                                 'gl_Position = ' + Names.uniforms.projection + '* worldPos;',
                             ].join('\n'))
 
-                    ].join('\n')),                
+                    ].join('\n')),
+                ifDef(
+                    Defines.ssaoMap,
+                    Names.varyings.clipPosition + '= gl_Position;'),
                 '}'
         ].join('\n');
 
@@ -1301,6 +1322,7 @@
             'precision mediump float;' + '\n' + 
             
             varyings.worldPosition +
+            varyings.clipPosition + 
             varyings.worldNormal +
             varyings.textCoord +
             varyings.worldTangent +
@@ -1309,6 +1331,7 @@
 
             uniforms.fog +            
             uniforms.ambientLight +
+            uniforms.ssaoMap +
 
             uniforms.litMat +
             
@@ -1391,6 +1414,14 @@
                     Defines.light,
                     [
                         'vec4 ambientTerm = ' + Names.uniforms.ambientLight + '*' + Names.uniforms.materialAmbient + ';',
+                        ifDef(
+                            Defines.ssaoMap,
+                            [
+                                'vec2 positionNDC = ' + Names.varyings.clipPosition + '.xy/' + Names.varyings.clipPosition + '.w;',
+                                'ambientTerm.xyz *= texture2D(' + Names.uniforms.ssaoMap + ', positionNDC*0.5+0.5).r;',
+
+                            ].join('\n')
+                        ),
                         ifDef(
                             Defines.lightSource,
                             [

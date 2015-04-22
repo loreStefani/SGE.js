@@ -192,7 +192,11 @@
             SimpleVariable.call(this, Names.materialAmbient, 'ambient', values.get(0), copyVector4SetFun);
             SimpleVariable.call(this, Names.materialDiffuse, 'diffuse', values.get(1), copyVector4SetFun);
             SimpleVariable.call(this, Names.materialSpecular, 'specular', values.get(2), copyVector4SetFun);
-        }        
+        }
+
+        function SSAOMaterial() {
+            SimpleVariable.call(this, Names.ssaoMap, 'ssaoMap');
+        }
         
         function makeMaterial(parameters, mat) {
 
@@ -319,6 +323,13 @@
                         properties.shadowLerp = { value: true };
                     }
                 }
+
+                if (parameters.ssaoMap) {
+                    SSAOMaterial.call(material);
+                    defines[Defines.ssaoMap] = true;
+                    material.ssaoMap = parameters.ssaoMap;
+                }
+
             }
 
             if (parameters.fog) {
@@ -384,6 +395,8 @@
                         receiveShadows: this.receiveShadows,
                         shadowLerp: this.shadowLerp,
                         pcf : this.pcf,
+
+                        ssaoMap : this.ssaoMap,
 
                         reflect: this.reflect,
                         envMap: this.envMap,

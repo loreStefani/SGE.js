@@ -518,7 +518,7 @@
                 state.currBlendAlphaDestFunc = state.defaultBlendAlphaDestFunc;
                 state.currBlendRGBDestFunc = state.defaultBlendRGBDestFunc;
 
-                state.currPrimitiveTopology = glPrimitiveTopology(gl, state.defaultPrimitiveTopology);
+                state.currPrimitiveTopology = glPrimitiveTopology(gl, state.defaultPrimitiveTopology, state);
 
                 state.clearColor = state.defaultClearColor;
                 state.clearDepth = state.defaultClearDepth;
@@ -533,7 +533,7 @@
                 state.floatRenderTarget_EXT = gl.getExtension('WEBGL_color_buffer_float');
                 state.multipleRenderTargets_EXT = gl.getExtension('WEBGL_draw_buffers');
                 if (state.multipleRenderTargets_EXT != null)
-                    state.multipleRenderTargetsCount_EXT = gl.MAX_COLOR_ATTACHMENTS_WEBGL;
+                    state.multipleRenderTargetsCount_EXT = gl.getParameter(state.multipleRenderTargets_EXT.MAX_DRAW_BUFFERS_WEBGL);
                 else
                     state.multipleRenderTargetsCount_EXT = 0;
 
@@ -732,18 +732,18 @@
         *  here are handled NPOT (non power of two ) textures : according to the specs a NPOT texture can't use mipmaps
         *  and the only wrap mode allowed is CLAMP_TO_EDGE
         */
-        function getTextureParameters(gl, texture, params) {
+        function getTextureParameters(gl, texture, params, state) {
 
-            var magnification = glFilter(gl, texture.magnification);
+            var magnification = glFilter(gl, texture.magnification, state);
             var minification = texture.minification;
             var wrapS;
             var wrapT;
 
             //apply restriction for NPOT textures
             if (texture.powerOfTwo) {
-                wrapS = glWrapMode(gl, texture.wrapS);
-                wrapT = glWrapMode(gl, texture.wrapT);
-                minification = glFilter(gl, minification);
+                wrapS = glWrapMode(gl, texture.wrapS, state);
+                wrapT = glWrapMode(gl, texture.wrapT, state);
+                minification = glFilter(gl, minification, state);
             } else {
                 wrapS = gl.CLAMP_TO_EDGE;
                 wrapT = gl.CLAMP_TO_EDGE;
@@ -859,7 +859,7 @@
 
         //ENUM CONVERSION FUNCTIONS
 
-        function glPrimitiveTopology(gl, primitiveTopology) {
+        function glPrimitiveTopology(gl, primitiveTopology, state) {
             switch (primitiveTopology) {
                 case PrimitiveTopology.POINTS:
                     return gl.POINTS;
@@ -880,7 +880,7 @@
             }
         }
 
-        function glFilter(gl, filter) {
+        function glFilter(gl, filter, state) {
             switch (filter) {
                 case Textures.TextureFilter.LINEAR:
                     return gl.LINEAR;
@@ -899,7 +899,7 @@
             }
         }
 
-        function glWrapMode(gl, wrapMode) {
+        function glWrapMode(gl, wrapMode, state) {
             switch (wrapMode) {
                 case Textures.TextureWrapMode.REPEAT:
                     return gl.REPEAT;
@@ -912,7 +912,7 @@
             }
         }
 
-        function glImageFormat(gl, imageFormat) {
+        function glImageFormat(gl, imageFormat, state) {
             switch (imageFormat) {                
                 case Textures.ImageFormat.RGB:
                     return gl.RGB;
@@ -923,7 +923,7 @@
             }
         }
 
-        function glImageDataType(gl, imageDataType) {
+        function glImageDataType(gl, imageDataType, state) {
             switch (imageDataType) {
                 case Textures.ImageDataType.UNSIGNED_BYTE:
                     return gl.UNSIGNED_BYTE;
@@ -934,7 +934,20 @@
             }
         }
 
-        function glCubeFace(gl, cubeFace) {
+        function glDepthDataType(gl, depthDataType, state) {
+            switch (depthDataType) {
+                case Textures.DepthDataType.SHORT:
+                    return gl.DEPTH_COMPONENT16;
+                case Textures.DepthDataType.FLOAT:
+                    if (state.floatRenderTarget_EXT != null)
+                        return state.floatRenderTarget_EXT.RGBA32F_EXT;
+                    throw new Error('invalid depth data type');
+                default:
+                    throw new Error('invalid depth data type');
+            }
+        }
+
+        function glCubeFace(gl, cubeFace, state) {
             switch (cubeFace) {
                 case Textures.CubeMapFace.POSITIVE_X:
                     return gl.TEXTURE_CUBE_MAP_POSITIVE_X;
@@ -1131,12 +1144,15 @@
         }
 
         //render target object descriptor
-        function RenderTargetDesc(obj, releasedListener, glRenderTarget, glDepthBuffer) {
+        function RenderTargetDesc(obj, releasedListener, glRenderTarget, colorTextureCount, glDepthBuffer, glDepthBufferDataType) {
             Desc.call(this, obj, releasedListener);
             //the webgl framebuffer object
             this.glRenderTarget = glRenderTarget;
+            this.colorTextureCount = colorTextureCount;
             //the webgl renderbuffer object
             this.glDepthBuffer = glDepthBuffer;
+            this.glDepthBufferDataType = glDepthBufferDataType;
+
 
             this.needsUpdate = false;
             var _this = this;
@@ -1146,7 +1162,13 @@
             this.release = (function () {
                 var descRelease = _this.release;
                 return function () {
-                    obj.colorTexture.removeEventListener('sizeChanged', _this.sizeChangedListener);
+                    var colorTexture = obj.colorTexture;
+                    if(colorTexture instanceof Array)
+                        for (var i = 0; i < colorTextureCount; i++)
+                            colorTexture[i].removeEventListener('sizeChanged', _this.sizeChangedListener);
+                    else
+                        colorTexture.removeEventListener('sizeChanged', _this.sizeChangedListener);
+
                     descRelease.call(_this);
                 };
             })();
@@ -1699,7 +1721,7 @@
 
                     //initialize texture parameters and data
                     var params = {};
-                    getTextureParameters(gl, texture, params);
+                    getTextureParameters(gl, texture, params, state);
                     setTextureParameters(gl, target, params, null, state);
 
                     setTextureData(gl, texture, state);
@@ -1792,7 +1814,7 @@
             if (updateParams) {
                 var params = textureDesc.params;
                 var newParams = Pools.ObjectPool.get();
-                getTextureParameters(gl, texture, newParams);
+                getTextureParameters(gl, texture, newParams, state);
                 setTextureParameters(gl, target, newParams, params, state);
                 params.magnification = newParams.magnification;
                 params.minification = newParams.minification;
@@ -1829,8 +1851,8 @@
         // sets data and mipmap hierarchy (if provided and texture is not a NPOT texture) of a texture object
         function setTextureData(gl, texture, state) {
 
-            var imageFormat = glImageFormat(gl, texture.imageFormat);
-            var imageDataType = glImageDataType(gl, texture.imageDataType);
+            var imageFormat = glImageFormat(gl, texture.imageFormat, state);
+            var imageDataType = glImageDataType(gl, texture.imageDataType, state);
             var data = texture.imageData;
             var width = texture.width;
             var height = texture.height;
@@ -1891,55 +1913,93 @@
 
                 //get color texture
                 var colorTexture = renderTarget.colorTexture;
+                var colorTextureCount;
+                var width;
+                var height;
+                var colorTextureDataType;
+                
+                var attachmentsProperties;
+                var multipleRenderTargets_EXT = null;
 
                 //check for MRT
                 if (colorTexture instanceof Array) {
-                                        
-                    if (state.multipleRenderTargets_EXT == null)
+
+                    colorTextureCount = colorTexture.length;                    
+
+                    multipleRenderTargets_EXT = state.multipleRenderTargets_EXT;
+
+                    if (multipleRenderTargets_EXT == null)
                         throw new Error('MRT not supported');
-                    var colorTextureCount = colorTexture.length;
+                    
                     if (state.multipleRenderTargetsCount_EXT < colorTextureCount)
                         throw new Error('MRT count not supported');
-                    //TODO
+                    
+                    width = colorTexture[0].width;
+                    height = colorTexture[0].height;
+                    colorTextureDataType = colorTexture[0].imageDataType;
+
+                    attachmentsProperties = [multipleRenderTargets_EXT.COLOR_ATTACHMENT0_WEBGL];
+
+                    for (var i = 1; i < colorTextureCount; i++) {
+                        var colorText = colorTexture[i];
+                        if (colorText.width !== width || colorText.height !== height || colorText.imageDataType !== colorTextureDataType)
+                            throw new Error('MRT must be the same size and data type');
+                        attachmentsProperties.push(multipleRenderTargets_EXT['COLOR_ATTACHMENT' + i + '_WEBGL']);
+                    }                    
+
+                } else {
+                    colorTextureCount = 1;
+                    width = colorTexture.width;
+                    height = colorTexture.height;
+                    colorTextureDataType = colorTexture.imageDataType;
+                    colorTexture = [colorTexture];
+                    attachmentsProperties = [gl.COLOR_ATTACHMENT0];
                 }
-
-
-                var width = colorTexture.width;
-                var height = colorTexture.height;
-
+                
                 //check if the size is allowed
                 if (width > state.limits.MAX_RENDERBUFFER_SIZE || height > state.limits.MAX_RENDERBUFFER_SIZE)
                     throw new Error('invalid render target size');
-                
-                var colorTexDesc = getDesc(gl, colorTexture, initTexture, state.textures, state);
-                var glColorTextureTarget = colorTexDesc.target;
+
+                //if (colorTextureDataType == Textures.ImageDataType.FLOAT && !state.floatRenderTarget_EXT)
+                //    throw new Error('float render target not supported');
 
                 //create depth buffer        
+                var glDepthBufferDataType = glDepthDataType(gl, renderTarget.depthDataType, state);
                 var glDepthBuffer = gl.createRenderbuffer();
                 gl.bindRenderbuffer(gl.RENDERBUFFER, glDepthBuffer);
-                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+                gl.renderbufferStorage(gl.RENDERBUFFER, glDepthBufferDataType, width, height);
 
                 //create render target
                 var glRenderTarget = gl.createFramebuffer();
                 var currBoundRenderTarget = getBoundRenderTarget(gl, state);
                 bindRenderTarget(gl, glRenderTarget, state);
-                
-                //attach color texture according to its type
-                var glColorTexture = colorTexDesc.glTexture;
-                var currBoundTexture = getBoundTexture(gl, glColorTextureTarget, state);
-                bindTexture(gl, glColorTextureTarget, glColorTexture, state);
 
-                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-                    glColorTextureTarget == gl.TEXTURE_CUBE_MAP ? glCubeFace(gl, renderTarget.cubeMapFace) : glColorTextureTarget,
-                    glColorTexture, 0);
+                if (multipleRenderTargets_EXT != null)
+                    multipleRenderTargets_EXT.drawBuffersWEBGL(attachmentsProperties);
 
                 //attach depth buffer
                 gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, glDepthBuffer);
 
-                //reset state
-                bindTexture(gl, glColorTextureTarget, currBoundTexture, state);
-                bindRenderTarget(gl, currBoundRenderTarget, state);
+                for (var i = 0; i < colorTextureCount; i++) {
+
+                    var colorTexDesc = getDesc(gl, colorTexture[i], initTexture, state.textures, state);
+                    var glColorTextureTarget = colorTexDesc.target;
+
+                    //attach color texture according to its type
+                    var glColorTexture = colorTexDesc.glTexture;
+                    var currBoundTexture = getBoundTexture(gl, glColorTextureTarget, state);
+                    bindTexture(gl, glColorTextureTarget, glColorTexture, state);
+                                        
+                    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentsProperties[i],
+                        glColorTextureTarget == gl.TEXTURE_CUBE_MAP ? glCubeFace(gl, renderTarget.cubeMapFace, state) : glColorTextureTarget,
+                        glColorTexture, 0);
+
+                    //reset state
+                    bindTexture(gl, glColorTextureTarget, currBoundTexture, state);
+                }
+
                 gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+                bindRenderTarget(gl, currBoundRenderTarget, state);                
 
                 //check if creation succeded
                 var e = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
@@ -1951,8 +2011,9 @@
                 }
 
                 renderTarget.addEventListener('released', releasedListener);
-                renderTargetDesc = renderTargetDescPool.get(renderTarget, releasedListener, glRenderTarget, glDepthBuffer);
-                colorTexture.addEventListener('sizeChanged', renderTargetDesc.sizeChangedListener);
+                renderTargetDesc = renderTargetDescPool.get(renderTarget, releasedListener, glRenderTarget, colorTextureCount, glDepthBuffer, glDepthBufferDataType);
+                for (var i = 0; i < colorTextureCount; i++)
+                    colorTexture[i].addEventListener('sizeChanged', renderTargetDesc.sizeChangedListener);
                 renderTargets[renderTargetID] = renderTargetDesc;
             };
 
@@ -1995,13 +2056,26 @@
                 if (!renderTargetDesc.needsUpdate)
                     return;
 
+                var width;
+                var height;
+
                 // update color attachment
                 var colorTexture = renderTargetDesc.obj.colorTexture;
-                updateTexture(gl, colorTexture, state);
+                if(colorTexture instanceof Array){
+                    var colorTextureCount = renderTargetDesc.colorTextureCount;
+                    for(var i = 0 ; i < colorTextureCount; i++)
+                        updateTexture(gl, colorTexture[i], state);
+                    width = colorTexture[0].width;
+                    height = colorTexture[0].height;
+                }else{
+                    updateTexture(gl, colorTexture, state);
+                    width = colorTexture.width;
+                    height = colorTexture.height;
+                }
 
                 //update depth attachment, i.e. resize it
                 gl.bindRenderbuffer(gl.RENDERBUFFER, renderTargetDesc.glDepthBuffer);
-                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, colorTexture.width, colorTexture.height);
+                gl.renderbufferStorage(gl.RENDERBUFFER, renderTargetDesc.glDepthBufferDataType, width, height);
                 gl.bindRenderbuffer(gl.RENDERBUFFER, null);
 
                 renderTargetDesc.needsUpdate = false;
@@ -2289,7 +2363,7 @@
             if (primitiveTopology == null)
                 primitiveTopology = state.defaultPrimitiveTopology;
 
-            state.currPrimitiveTopology = glPrimitiveTopology(state.gl, primitiveTopology);
+            state.currPrimitiveTopology = glPrimitiveTopology(state.gl, primitiveTopology, state);
         }
 
         function setVertexBuffers(vertexBuffers, state) {

@@ -317,7 +317,7 @@
                         if (hasUniformScale) {
                             var s = scale.x;
                             if (s != 1.0) 
-                                scaleMatDataUniform(data, s, 3);
+                                scaleMatDataUniform(data, s, 3, 4);
                         } else {
                             //apply scale transform on the right ( scale columns)
                             var s = scale.x;
@@ -360,7 +360,7 @@
                             if (hasUniformScale){
                                 var s = scale.x;
                                 if(s != 1.0)
-                                    scaleMatDataUniform(data, 1.0/s, 3);
+                                    scaleMatDataUniform(data, 1.0/s, 3, 4);
                             } else {
                                 //apply scale transform on the left (scale rows)
                                 var invScale = 1.0 / scale.x;
@@ -704,9 +704,9 @@
 
     })();
     
-    function scaleMatDataUniform(m, s, count) {
+    function scaleMatDataUniform(m, s, count, size) {
         for (var i = 0; i < count; i++) {
-            var index = i * count;
+            var index = i * size;
             for (var j = 0; j < count; j++)
                 m[index + j] *= s;
         }

@@ -1461,11 +1461,8 @@
         }
         
         
-              
-        
         RenderSystem.prototype = Object.create(System.prototype);
         Object.defineProperty(RenderSystem.prototype, 'constructor', { value: RenderSystem });
-
-        
+                
         return RenderSystem;
     });

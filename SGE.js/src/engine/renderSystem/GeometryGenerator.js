@@ -201,7 +201,6 @@
     }
     
     //Adapted from '3D Game Programming with DirectX 11' by Frank Luna (http://www.d3dcoder.net/d3d11.htm)
-
     function boxGeometry(width, height, depth, genTextCoord, genNormal, genTangent) {
 
         genNormal = genNormal == null ? false : genNormal;
