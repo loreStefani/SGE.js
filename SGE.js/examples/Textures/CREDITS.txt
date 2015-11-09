@@ -1,7 +1,7 @@
-aquired from http://textures.thefree3dmodels.com/
+acquired from http://textures.thefree3dmodels.com/
 -691.jpg
 
-aquired from http://learningwebgl.com/blog/?p=571
+acquired from http://learningwebgl.com/blog/?p=571
 -crate.gif 
 
 created by 3dregenerator (http://tf3dm.com/user/3dregenerator)
@@ -13,7 +13,7 @@ created by 3dregenerator (http://tf3dm.com/user/3dregenerator)
 -tree_oak_leaf_d.png
 -tree_oak_trunk_d.jpg
 
-aquired from http://www.textureking.com/
+acquired from http://www.textureking.com/
 -DSC_3518.jpg
 
 created with crazybump (http://www.crazybump.com/)
@@ -24,13 +24,13 @@ created with crazybump (http://www.crazybump.com/)
 -FloorsMarble0023_S_NRM.jpg
 -FloorsMarble0023_S_SPEC.jpg
 
-aquired from www.cgtextures.com/
+acquired from www.cgtextures.com/
 -Fiberglass0009_S.jpg
 -FloorsMarble0023_S.jpg
 -WoodFine0039_1_S.jpg
 -RockSmoothErosion0026_1_S.jpg
 
-aquired from '3D Game Programming with DirectX 11' by Frank Luna (http://www.d3dcoder.net/d3d11.htm)
+acquired from '3D Game Programming with DirectX 11' by Frank Luna (http://www.d3dcoder.net/d3d11.htm)
 -flare0.png
 
 crated by duion (http://opengameart.org/node/23917)
@@ -38,7 +38,7 @@ crated by duion (http://opengameart.org/node/23917)
 -william_wall_01_N.png
 -william_wall_01_S.png
 
-aquired from http://pixshark.com/
+acquired from http://pixshark.com/
 -mirror.jpg
 
 created by Spiney (http://opengameart.org/node/8127)
@@ -47,9 +47,9 @@ created by Spiney (http://opengameart.org/node/8127)
 created by yughues (http://opengameart.org/content/tilling-textures-pack-32)
 -grass_diffuse.jpg
 
-aquired from http://threejs.org/examples/webgl_materials_normalmap.html
+acquired from http://threejs.org/examples/webgl_materials_normalmap.html
 -Infinite-Level_02_Tangent_SmoothUV.jpg
 -Map-SPEC.jpg
 
-aquired from http://graphics.cs.williams.edu/data/meshes.xml
+acquired from http://graphics.cs.williams.edu/data/meshes.xml
 -lambertian.jpg
