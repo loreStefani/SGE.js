@@ -3,13 +3,13 @@ created by 3dregenerator (http://tf3dm.com/user/3dregenerator)
 -tree_oak.obj
 -model.json (rigged by Mixamo (https://www.mixamo.com/))
 
-aquired from http://graphics.cs.williams.edu/data/meshes.xml
+acquired from http://graphics.cs.williams.edu/data/meshes.xml
 -head.OBJ
 
-aquired from http://goanna.cs.rmit.edu.au/~pknowles/models.html
+acquired from http://goanna.cs.rmit.edu.au/~pknowles/models.html
 -wt_teapot.obj
 
-aquired from Mixamo (https://www.mixamo.com/)
+acquired from Mixamo (https://www.mixamo.com/)
 -zombie_idle.json
 -zombie_jump.json
 -zombie_left_strafe.json
