@@ -41,7 +41,7 @@
                             spinning = false;
                             spinner.stop();
                         }
-                        var errorElement = $('<p>').append($('<b>', { text: 'Something were wrong!' }));
+                        var errorElement = $('<p>').append($('<b>', { text: 'Something went wrong!' }));
                         $(errorElement).append($('<p>', {text : error}));
                         $(container).append(errorElement);
                         $(container).fadeIn('fast');

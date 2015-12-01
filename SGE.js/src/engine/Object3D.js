@@ -117,7 +117,7 @@
 
                     var componentID = component.ID;
                     var componentObject = perComponentObject[componentID];
-                    if (componentObject == null || componentObject == this)
+                    if (componentObject == null || componentObject != this)
                         return;
                                                                                 
                     var componentType = component.componentType;

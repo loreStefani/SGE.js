@@ -75,27 +75,28 @@
         //build vertex buffer
         var vertexLayout = new Buffers.VertexLayout();
         vertexLayout.addAttributeDesc(currPositionAttribute, 3, DataType.FLOAT);
-        var dataMap = { a_position: new Float32Array(positions) };
+        var dataMap = {};
+        dataMap[currPositionAttribute] = new Float32Array(positions);
         if (keepPositions)
-            parameters.positions = convertToVector(dataMap.a_position, 3);
+            parameters.positions = convertToVector(dataMap[currPositionAttribute], 3);
 
         if (normals != null) {
             vertexLayout.addAttributeDesc(currNormalAttribute, 3, DataType.FLOAT);
-            dataMap.a_normal = new Float32Array(normals);            
+            dataMap[currNormalAttribute] = new Float32Array(normals);
         }
         if (tangents != null) {
             vertexLayout.addAttributeDesc(currTangentAttribute, 3, DataType.FLOAT);
-            dataMap.a_tangent = new Float32Array(tangents);            
+            dataMap[currTangentAttribute] = new Float32Array(tangents);
         }
         if (textCoords != null) {
             vertexLayout.addAttributeDesc(currTextCoordAttribute, 2, DataType.FLOAT);
-            dataMap.a_textCoord = new Float32Array(textCoords);            
+            dataMap[currTextCoordAttribute] = new Float32Array(textCoords);            
         }
         if (skinned) {
             vertexLayout.addAttributeDesc(currSkinWeightsAttribute, influencesPerVertex, DataType.FLOAT);
             vertexLayout.addAttributeDesc(currSkinIndicesAttribute, influencesPerVertex, DataType.FLOAT);
-            dataMap.a_skinWeights = new Float32Array(skinWeights);
-            dataMap.a_skinIndices = new Float32Array(skinIndices);
+            dataMap[currSkinWeightsAttribute] = new Float32Array(skinWeights);
+            dataMap[currSkinIndicesAttribute] = new Float32Array(skinIndices);
             parameters.influences = skinInfluences;
             parameters.influencesPerVertex = influencesPerVertex;
         }

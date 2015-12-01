@@ -87,8 +87,8 @@
                         return;
                     
                     var objectComponents = objectDesc.components;
-                    object3D.removeEventListener('removedComponent', objectDesc.removedComponentListener);
-                    object3D.removeEventListener('addedComponent', objectDesc.addedComponentListener);
+                    object3D.removeEventListener('componentRemoved', objectDesc.removedComponentListener);
+                    object3D.removeEventListener('componentAdded', objectDesc.addedComponentListener);
                     
                     for (var ID in objectComponents)
                         removeComponentFromSystem(ID, objectComponents);

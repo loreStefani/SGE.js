@@ -191,7 +191,7 @@
         return desc;
     }
     
-    //it is not necessary keep a list of materials which use the program
+    //keeping a list of materials which use the program is not necessary
     //because a program can be released only releasing one of such materials
     function releaseProgram(program, state) {        
         var programID = program.ID;

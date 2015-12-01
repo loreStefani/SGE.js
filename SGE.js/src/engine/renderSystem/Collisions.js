@@ -100,11 +100,11 @@
                     var center = sphere.center;
 
                     offset.set(radius, radius, radius);
-                    this.min = offset.add(center);
+                    this.max = offset.add(center);
 
                     radius *= -1.0;
                     offset.set(radius, radius, radius);
-                    this.max = offset.add(center);
+                    this.min = offset.add(center);
                 };
                 
             })()
@@ -739,22 +739,27 @@
 
         var frustumPlanes = frustum.planes;
 
+        var intersects = 0;
+
         for (var i = 0; i < 6; i++) {
 
             var testPlane = testPlaneFun(boundings, frustumPlanes[i]);
 
             if (testPlane == 1)
                 //intersection
-                return 1;
+                intersects = 1;
             else if (testPlane == 0)
                 //positive space of the plane -> entirely outside the frustum
                 return 0;
 
             /*
             * negative space of the plane -> could be entirely inside the frustum 
-            * or intersect another plane, keep testing
+            * or intersect another plane (or outside for another plane), keep testing
             */
         }
+
+        if (intersects == 1)
+            return 1;
 
         //entirely inside the frustum
         return -1;
