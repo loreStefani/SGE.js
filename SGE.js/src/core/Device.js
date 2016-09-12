@@ -2946,13 +2946,19 @@
                                     break;
                                 case States.BlendState.ALPHA_BLEND:
                                     eqRGB = eqAlpha = gl.FUNC_ADD;
-                                    srcRGB = srcAlpha = gl.SRC_ALPHA;
-                                    dstRGB = dstAlpha = gl.ONE_MINUS_SRC_ALPHA;
+                                    //srcRGB = srcAlpha = gl.SRC_ALPHA;
+                                    //dstRGB = dstAlpha = gl.ONE_MINUS_SRC_ALPHA;
+                                    srcRGB =  gl.SRC_ALPHA;
+                                    dstRGB =  gl.ONE_MINUS_SRC_ALPHA;
+                                    srcAlpha = gl.ZERO;
+                                    dstAlpha = gl.ONE;
                                     break;
                                 case States.BlendState.ADD_ALPHA_BLEND:
                                     eqRGB = eqAlpha = gl.FUNC_ADD;
-                                    srcRGB = srcAlpha = gl.SRC_ALPHA;
-                                    dstRGB = dstAlpha = gl.ONE;                                    
+                                    //srcRGB = srcAlpha = gl.SRC_ALPHA;
+                                    srcRGB = gl.SRC_ALPHA;
+                                    dstRGB = dstAlpha = gl.ONE;
+                                    srcAlpha = gl.ZERO;
                                     break;
                                 case States.BlendState.NO_COLOR:
                                     eqRGB = eqAlpha = gl.FUNC_ADD;

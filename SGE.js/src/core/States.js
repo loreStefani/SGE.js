@@ -10,7 +10,7 @@
 
         /* 
         * C_dst = A_src * C_src + (1 - A_src) * C_dst
-        * A_dst = A_src * A_src + (1 - A_src) * A_dst
+        * A_dst = A_dst
         */
         ALPHA_BLEND: 0,
         /* 
@@ -35,7 +35,7 @@
         MUL_BLEND: 4,
         /* 
         * C_dst = A_src * C_src + C_dst
-        * A_dst = A_src * A_src + A_dst
+        * A_dst = A_dst
         */
         ADD_ALPHA_BLEND: 5,
 

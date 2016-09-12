@@ -160,7 +160,14 @@
                 var canvas = parameters.canvas;
                 if (canvas == null)
                     canvas = $('<canvas>', { id: 'sge_canvas' }).get(0);
-                $(canvas).css({ width: '100%', height: '100%', margin: 0, padding: 0, left: '0px', top: '0px' });
+
+                var backGroundColor = parameters.backGroundColor;
+                var r = Math.round(backGroundColor.x * 255);
+                var g = Math.round(backGroundColor.y * 255);
+                var b = Math.round(backGroundColor.z * 255);
+                var canvasColor = 'rgb(' + r + ',' + g + ',' + b + ')';
+
+                $(canvas).css({ width: '100%', height: '100%', margin: 0, padding: 0, left: '0px', top: '0px', 'background-color' : canvasColor });
                 container.append(canvas);
 
                 dev = new Device(canvas);

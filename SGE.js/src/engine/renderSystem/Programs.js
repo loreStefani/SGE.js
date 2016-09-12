@@ -1176,7 +1176,7 @@
                     [
                         'float s = (toEyeDistance - ' + Names.uniforms.fogStartDistanceAndRange +'.x) / ' + Names.uniforms.fogStartDistanceAndRange + '.y;',
                         's = clamp(s, 0.0, 1.0);',
-                        'gl_FragColor = mix(gl_FragColor, ' + Names.uniforms.fogColor + ', s) ;'
+                        'gl_FragColor.xyz = mix(gl_FragColor.xyz, ' + Names.uniforms.fogColor + '.xyz, s);'
 
                     ].join('\n')),
 
