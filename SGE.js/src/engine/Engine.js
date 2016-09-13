@@ -162,12 +162,20 @@
                     canvas = $('<canvas>', { id: 'sge_canvas' }).get(0);
 
                 var backGroundColor = parameters.backGroundColor;
-                var r = Math.round(backGroundColor.x * 255);
-                var g = Math.round(backGroundColor.y * 255);
-                var b = Math.round(backGroundColor.z * 255);
-                var canvasColor = 'rgb(' + r + ',' + g + ',' + b + ')';
+                if (backGroundColor != null)
+                {
+                    var r = Math.round(backGroundColor.x * 255);
+                    var g = Math.round(backGroundColor.y * 255);
+                    var b = Math.round(backGroundColor.z * 255);
+                    var canvasColor = 'rgb(' + r + ',' + g + ',' + b + ')';
 
-                $(canvas).css({ width: '100%', height: '100%', margin: 0, padding: 0, left: '0px', top: '0px', 'background-color' : canvasColor });
+                    $(canvas).css({ width: '100%', height: '100%', margin: 0, padding: 0, left: '0px', top: '0px', 'background-color': canvasColor });
+                }
+                else
+                {
+                    $(canvas).css({ width: '100%', height: '100%', margin: 0, padding: 0, left: '0px', top: '0px' });
+                }
+                
                 container.append(canvas);
 
                 dev = new Device(canvas);
